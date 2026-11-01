@@ -271,8 +271,9 @@ const zhCN: typeof en = {
 
 /** Steam's UI language as a lower-case locale, e.g. "zh-cn" or "en-us". */
 function steamLocale(): string {
-  const steam = window as { LocalizationManager?: { m_rgLocalesToUse?: string[] } };
-  return (steam.LocalizationManager?.m_rgLocalesToUse?.[0] ?? navigator.language ?? "").toLowerCase();
+  // globalThis is window in Steam, and also exists where the tests run (Node).
+  const steam = globalThis as { LocalizationManager?: { m_rgLocalesToUse?: string[] } };
+  return (steam.LocalizationManager?.m_rgLocalesToUse?.[0] ?? globalThis.navigator?.language ?? "").toLowerCase();
 }
 
 const locale = steamLocale();

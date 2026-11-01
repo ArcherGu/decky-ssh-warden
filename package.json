@@ -3,11 +3,15 @@
   "version": "0.1.0",
   "description": "SSH Warden: manage the Steam Deck's SSH service from Game Mode",
   "type": "module",
+  "packageManager": "pnpm@12.4.1",
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
-    "check:i18n": "python3 scripts/check_i18n.py",
+    "check:i18n": "${PYTHON:-python3} scripts/check_i18n.py",
+    "test": "pnpm test:frontend && pnpm test:backend",
+    "test:frontend": "node --test \"tests/frontend/*.test.ts\"",
+    "test:backend": "PYTHONPATH=py_modules ${PYTHON:-python3} -m unittest discover -s tests/backend",
     "package": "pnpm build && bash scripts/package.sh"
   },
   "repository": {
