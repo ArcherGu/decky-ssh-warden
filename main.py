@@ -2,7 +2,7 @@ import asyncio
 
 import decky
 
-from sshwarden import sshd, status
+from sshwarden import port, settings, sshd, status
 
 
 async def _call(fn, *args) -> dict:
@@ -30,7 +30,11 @@ class Plugin:
             return await _call(sshd.cancel_autooff)
         return await _call(sshd.schedule_autooff, int(minutes))
 
+    async def set_port(self, number: int) -> dict:
+        return await _call(port.set_port, int(number))
+
     async def _main(self):
+        settings.init(decky.DECKY_PLUGIN_SETTINGS_DIR)
         decky.logger.info("SSH Warden loaded")
 
     async def _unload(self):

@@ -5,7 +5,7 @@
 import json
 import sys
 
-from . import sshd, status
+from . import port, sshd, status
 
 
 def on_off(value: str) -> bool:
@@ -20,6 +20,7 @@ def main(argv: list[str]) -> int:
         "service": lambda v: sshd.set_running(on_off(v)),
         "autostart": lambda v: sshd.set_autostart(on_off(v)),
         "autooff": lambda minutes: sshd.schedule_autooff(int(minutes)) if minutes != "cancel" else sshd.cancel_autooff(),
+        "port": lambda number: port.set_port(int(number)),
     }
     if not argv or argv[0] not in commands:
         print(f"usage: python3 -m sshwarden {{{'|'.join(commands)}}} [args...]", file=sys.stderr)

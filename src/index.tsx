@@ -2,6 +2,7 @@ import { PanelSection, PanelSectionRow, staticClasses } from "@decky/ui";
 import { definePlugin } from "@decky/api";
 import { FaUserShield } from "react-icons/fa";
 import { useStatus } from "./useStatus";
+import { ConnectionSection } from "./sections/ConnectionSection";
 import { ServiceSection } from "./sections/ServiceSection";
 import { StatusSection } from "./sections/StatusSection";
 
@@ -20,6 +21,7 @@ function Content() {
     <>
       <ServiceSection status={status} refresh={refresh} />
       <StatusSection status={status} />
+      <ConnectionSection status={status} refresh={refresh} />
     </>
   );
 }

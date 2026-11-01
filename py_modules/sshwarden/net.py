@@ -52,3 +52,40 @@ def port_open_in_zone(zone: str, port: int) -> bool:
 
 def _blocks_port(rule: str, port: int) -> bool:
     return f'port="{port}"' in rule and 'protocol="tcp"' in rule and (" drop" in rule or " reject" in rule)
+
+
+def _firewall(zone: str, arg: str, check: bool = True) -> None:
+    """Apply a zone change both now (runtime) and across reboots (permanent)."""
+    run(["firewall-cmd", f"--zone={zone}", arg], check=check)
+    run(["firewall-cmd", "--permanent", f"--zone={zone}", arg], check=check)
+
+
+def lan_zones() -> set[str]:
+    """The default zone plus the zones of all active Wi-Fi/Ethernet devices."""
+    zones = {run(["firewall-cmd", "--get-default-zone"]).strip()}
+    zones.update(zone_of(n["device"]) for n in active_networks())
+    return zones
+
+
+def allow_ssh_port(port: int, data: dict) -> None:
+    """Open `port` in every LAN zone that does not already allow it; remember what we opened."""
+    if not firewall_running():
+        return
+    opened = data.setdefault("opened_ports", [])
+    for zone in sorted(lan_zones()):
+        entry = {"zone": zone, "port": port}
+        if entry in opened or port_open_in_zone(zone, port):
+            continue
+        _firewall(zone, f"--add-port={port}/tcp")
+        opened.append(entry)
+
+
+def close_ssh_ports(data: dict, keep: set[int]) -> None:
+    """Remove ports we opened earlier, except those in `keep`."""
+    opened = data.get("opened_ports", [])
+    for entry in list(opened):
+        if entry["port"] in keep:
+            continue
+        if firewall_running():
+            _firewall(entry["zone"], f"--remove-port={entry['port']}/tcp", check=False)
+        opened.remove(entry)

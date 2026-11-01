@@ -1,11 +1,18 @@
 import json
+import os
 import re
+import time
 
-from .proc import run
+from .proc import CommandError, run
 
 UNIT = "sshd.service"
 AUTOOFF_UNIT = "ssh-warden-autooff"
 MAX_AUTOOFF_MINUTES = 24 * 60
+
+# Our drop-in sorts before SteamOS's own (20-*, 99-*); sshd keeps the first value it reads.
+DROPIN = "/etc/ssh/sshd_config.d/05-ssh-warden.conf"
+MANAGED_KEYS = ("Port", "PasswordAuthentication")
+DEFAULT_PORT = 22
 
 
 def effective_config() -> dict[str, list[str]]:
@@ -19,6 +26,90 @@ def effective_config() -> dict[str, list[str]]:
 
 def ports(config: dict[str, list[str]]) -> list[int]:
     return sorted({int(p) for p in config.get("port", ["22"])})
+
+
+def read_managed() -> dict[str, str]:
+    """Settings currently written in our drop-in, e.g. {"Port": "2222"}."""
+    values: dict[str, str] = {}
+    try:
+        with open(DROPIN, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
+        return values
+    for line in lines:
+        line = line.strip()
+        if line and not line.startswith("#"):
+            key, _, value = line.partition(" ")
+            values[key] = value.strip()
+    return values
+
+
+def _write_dropin(values: dict[str, str]) -> None:
+    lines = [f"{k} {values[k]}" for k in MANAGED_KEYS if k in values]
+    if not lines:
+        if os.path.exists(DROPIN):
+            os.remove(DROPIN)
+        return
+    tmp = f"{DROPIN}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("# Managed by SSH Warden (Decky plugin). Change these in the plugin.\n")
+        f.write("\n".join(lines) + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, DROPIN)
+
+
+def _listening(port: int) -> bool:
+    return bool(run(["ss", "-Hltn", f"sport = :{port}"], check=False).strip())
+
+
+def update_config(changes: dict[str, str | None]) -> None:
+    """Change managed sshd settings (None removes one), validate and apply them.
+
+    Any failure (invalid config, sshd not coming back on the expected port) restores
+    the previous drop-in and restarts sshd with it, so a bad value cannot lock us out.
+    """
+    try:
+        with open(DROPIN, encoding="utf-8") as f:
+            previous: str | None = f.read()
+    except FileNotFoundError:
+        previous = None
+    values = read_managed()
+    for key, value in changes.items():
+        if value is None:
+            values.pop(key, None)
+        else:
+            values[key] = value
+    was_running = service_state()["running"]
+    _write_dropin(values)
+    try:
+        run(["sshd", "-t"])
+        if was_running:
+            run(["systemctl", "restart", UNIT])
+            expected = ports(effective_config())
+            deadline = time.monotonic() + 5
+            while not all(_listening(p) for p in expected):
+                if time.monotonic() > deadline:
+                    raise CommandError(f"sshd 没有在端口 {expected} 上启动")
+                time.sleep(0.2)
+    except Exception:
+        if previous is None:
+            if os.path.exists(DROPIN):
+                os.remove(DROPIN)
+        else:
+            with open(DROPIN, "w", encoding="utf-8") as f:
+                f.write(previous)
+        if was_running:
+            run(["systemctl", "restart", UNIT], check=False)
+        raise
+
+
+def port_owner(port: int) -> str | None:
+    """Name of a non-sshd process already listening on `port`, if any."""
+    out = run(["ss", "-Hltnp", f"sport = :{port}"], check=False)
+    for m in re.finditer(r'users:\(\("([^"]+)"', out):
+        if m.group(1) != "sshd":
+            return m.group(1)
+    return None
 
 
 def service_state() -> dict:
