@@ -163,14 +163,20 @@ def reload_firewall() -> None:
         run(["firewall-cmd", f"--zone={zone}", f"--change-interface={n['device']}"], check=False)
 
 
-def create_trusted_zone() -> None:
-    """Create TRUSTED_ZONE as a copy of the default zone's services and ports."""
+def create_trusted_zone(data: dict) -> None:
+    """Create TRUSTED_ZONE as a copy of the default zone's services and ports.
+
+    Ports the plugin itself opened in the default zone are not copied; sync_ssh_firewall()
+    adds (and records) whatever the trusted zone needs for SSH.
+    """
     base = default_zone()
+    ours = {f"{e['port']}/tcp" for e in data.get("firewall", []) if e["zone"] == base and e["kind"] == "port"}
     run(["firewall-cmd", "--permanent", f"--new-zone={TRUSTED_ZONE}"])
     for service in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-services"]).split():
         run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-service={service}"])
     for port in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-ports"]).split():
-        run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-port={port}"])
+        if port not in ours:
+            run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-port={port}"])
     reload_firewall()
 
 
