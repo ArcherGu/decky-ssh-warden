@@ -3,7 +3,7 @@
 #
 # While the plugin is being developed and tested remotely, a bad test can leave the
 # Steam Deck unreachable over SSH (sshd stopped, wrong port, firewall rule, changed
-# password...). This guard runs every minute from a systemd timer. When the SSH-related
+# password, removed public key...). This guard runs every minute from a systemd timer. When the SSH-related
 # state differs from the known-good baseline AND the developer has not touched the
 # heartbeat file for STALE_SECONDS, it restores the baseline so SSH works again.
 #
@@ -17,8 +17,9 @@ BASE="$STATE_DIR/baseline"
 HEARTBEAT=/home/deck/.ssh-warden-dev/heartbeat
 STALE_SECONDS=${STALE_SECONDS:-300}
 USER_NAME=deck
+SSH_DIR=/home/$USER_NAME/.ssh
 LOG="$STATE_DIR/guard.log"
-COMPONENTS="sshd password firewall nm"
+COMPONENTS="sshd password firewall nm keys"
 
 log() { echo "$(date '+%F %T') $*" | tee -a "$LOG"; }
 
@@ -44,6 +45,15 @@ fp_nm() {
   nmcli -t -f UUID connection show | sort | while read -r uuid; do
     echo "$uuid zone=$(nmcli -g connection.zone connection show "$uuid" </dev/null)"
   done
+}
+
+fp_keys() {
+  if [ -e "$SSH_DIR/authorized_keys" ]; then
+    stat -c '%a %U:%G' "$SSH_DIR/authorized_keys"
+    sha256sum < "$SSH_DIR/authorized_keys"
+  else
+    echo "no authorized_keys"
+  fi
 }
 
 hash_of() { "fp_$1" | sha256sum | cut -d' ' -f1; }
@@ -86,6 +96,8 @@ snapshot() {
   getent shadow "$USER_NAME" | cut -d: -f2 > "$BASE/shadow-hash"
   tar -C /etc -cpf "$BASE/firewalld.tar" firewalld
   fp_nm > "$BASE/nm-zones.txt"
+  # tar keeps the file's mode and owner; no archive means there was no authorized_keys.
+  [ -e "$SSH_DIR/authorized_keys" ] && tar -C "$SSH_DIR" -cpf "$BASE/authorized_keys.tar" authorized_keys
   chmod 600 "$BASE"/*
   log "baseline snapshot taken"
 }
@@ -132,12 +144,22 @@ rescue_firewall_and_nm() {
   log "firewall reloaded"
 }
 
+rescue_keys() {
+  if [ -f "$BASE/authorized_keys.tar" ]; then
+    [ -d "$SSH_DIR" ] || install -d -m 700 -o "$USER_NAME" -g "$USER_NAME" "$SSH_DIR"
+    tar -C "$SSH_DIR" -xpf "$BASE/authorized_keys.tar" && log "restored $SSH_DIR/authorized_keys"
+  else
+    rm -f "$SSH_DIR/authorized_keys" && log "removed $SSH_DIR/authorized_keys (there was none)"
+  fi
+}
+
 rescue() {
   local changed="$1"
   log "RESCUE start (changed: $changed, heartbeat age: $(heartbeat_age)s)"
   case " $changed " in *" sshd "*) rescue_sshd ;; esac
   case " $changed " in *" password "*) rescue_password ;; esac
   case " $changed " in *" firewall "*|*" nm "*) rescue_firewall_and_nm ;; esac
+  case " $changed " in *" keys "*) rescue_keys ;; esac
   date '+%F %T' > "$STATE_DIR/last-rescue"
   log "RESCUE done, still changed: '$(changed_components)'"
 }
