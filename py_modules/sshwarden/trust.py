@@ -22,7 +22,7 @@ def set_enabled(on: bool) -> None:
     data = settings.load()
     known = {n["uuid"] for n in net.saved_networks()}
     if on:
-        if not net.zone_exists(TRUSTED_ZONE):
+        if not (data.get("trusted_mode") and net.zone_exists(TRUSTED_ZONE)):
             net.create_trusted_zone(data)
         for uuid in data.get("trusted", []):
             if uuid in known:
@@ -35,8 +35,7 @@ def set_enabled(on: bool) -> None:
         for uuid in known:
             if net.connection_zone(uuid) == TRUSTED_ZONE:
                 net.set_connection_zone(uuid, "")
-        if net.zone_exists(TRUSTED_ZONE):
-            net.delete_trusted_zone()
+        net.delete_trusted_zone(data)
     settings.save(data)
 
 

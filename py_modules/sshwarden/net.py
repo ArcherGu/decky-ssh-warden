@@ -167,22 +167,37 @@ def create_trusted_zone(data: dict) -> None:
     """Create TRUSTED_ZONE as a copy of the default zone's services and ports.
 
     Ports the plugin itself opened in the default zone are not copied; sync_ssh_firewall()
-    adds (and records) whatever the trusted zone needs for SSH.
+    adds (and records) whatever the trusted zone needs for SSH. A zone left over from an
+    interrupted attempt is replaced, and a failed attempt removes its half-made zone, since
+    zone_exists() could not tell it from a finished one.
     """
+    delete_trusted_zone(data)
     base = default_zone()
     ours = {f"{e['port']}/tcp" for e in data.get("firewall", []) if e["zone"] == base and e["kind"] == "port"}
     run(["firewall-cmd", "--permanent", f"--new-zone={TRUSTED_ZONE}"])
-    for service in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-services"]).split():
-        run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-service={service}"])
-    for port in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-ports"]).split():
-        if port not in ours:
-            run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-port={port}"])
-    reload_firewall()
+    try:
+        for service in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-services"]).split():
+            run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-service={service}"])
+        for port in run(["firewall-cmd", "--permanent", f"--zone={base}", "--list-ports"]).split():
+            if port not in ours:
+                run(["firewall-cmd", "--permanent", f"--zone={TRUSTED_ZONE}", f"--add-port={port}"])
+        reload_firewall()
+    except Exception:
+        run(["firewall-cmd", "--permanent", f"--delete-zone={TRUSTED_ZONE}"], check=False)
+        run(["firewall-cmd", "--reload"], check=False)
+        raise
 
 
-def delete_trusted_zone() -> None:
-    run(["firewall-cmd", "--permanent", f"--delete-zone={TRUSTED_ZONE}"])
-    reload_firewall()
+def delete_trusted_zone(data: dict) -> None:
+    """Delete TRUSTED_ZONE if it exists, and forget the rules recorded for it.
+
+    Those rules went away with the zone. Keeping their records would make a new zone look
+    as if it already had them, so SSH on a custom port would stay closed there.
+    """
+    if zone_exists(TRUSTED_ZONE):
+        run(["firewall-cmd", "--permanent", f"--delete-zone={TRUSTED_ZONE}"])
+        reload_firewall()
+    data["firewall"] = [e for e in data.get("firewall", []) if e["zone"] != TRUSTED_ZONE]
 
 
 def _apply(entry: dict, add: bool) -> None:
