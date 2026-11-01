@@ -10,7 +10,7 @@ NAME=decky-ssh-warden
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/$NAME/dist"
-cp plugin.json package.json main.py LICENSE README.md "$STAGE/$NAME/"
+cp plugin.json package.json main.py LICENSE README.md README.zh-CN.md "$STAGE/$NAME/"
 cp dist/index.js "$STAGE/$NAME/dist/"
 rsync -a --exclude '__pycache__' py_modules "$STAGE/$NAME/"
 
