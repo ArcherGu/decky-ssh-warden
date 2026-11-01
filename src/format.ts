@@ -16,3 +16,8 @@ export function formatClock(seconds: number) {
 export function minutesUntil(seconds: number) {
   return Math.max(0, Math.ceil((seconds * 1000 - Date.now()) / 60000));
 }
+
+/** e.g. "ssh -p 2222 deck@192.168.1.5"; the port is left out when it is the default 22. */
+export function sshCommand(program: "ssh" | "ssh-copy-id", user: string, address: string, port: number) {
+  return `${program}${port === 22 ? "" : ` -p ${port}`} ${user}@${address}`;
+}

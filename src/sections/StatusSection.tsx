@@ -1,16 +1,11 @@
 import { Field, PanelSection, PanelSectionRow } from "@decky/ui";
 import { Status } from "../api";
-import { formatTime } from "../format";
+import { formatTime, sshCommand } from "../format";
 import { t } from "../i18n";
 
 const OK = "#5ba32b";
 const WARN = "#e0a33b";
 const MUTED = "#8b929a";
-
-function sshCommand(status: Status, address: string) {
-  const port = status.ports[0] ?? 22;
-  return `ssh ${status.user}@${address}${port === 22 ? "" : ` -p ${port}`}`;
-}
 
 export function StatusSection({ status }: { status: Status }) {
   const lastLogin = status.logins.recent[0];
@@ -33,7 +28,7 @@ export function StatusSection({ status }: { status: Status }) {
         <PanelSectionRow key={n.uuid}>
           <Field
             label={n.name}
-            description={n.addresses.map((a) => sshCommand(status, a)).join("\n") || t.status.noIPv4}
+            description={n.addresses.map((a) => sshCommand("ssh", status.user, a, status.ports[0] ?? 22)).join("\n") || t.status.noIPv4}
             bottomSeparator="none"
           >
             <span style={{ color: n.ssh_allowed ? OK : WARN }}>{n.ssh_allowed ? t.status.reachable : t.status.blocked}</span>
