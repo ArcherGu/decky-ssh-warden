@@ -6,6 +6,7 @@ Run this on the Deck as the deck user, stdlib only:
     python3 cdp.py targets
     python3 cdp.py eval SharedJSContext 'document.title'
     python3 cdp.py shot QuickAccess /tmp/qam.png
+    python3 cdp.py toggle QuickAccess '启用 SSH'     # click a ToggleField by its label
 """
 import base64
 import json
@@ -112,6 +113,16 @@ def screenshot(title_part: str, path: str):
     print(path)
 
 
+CLICK_TOGGLE_JS = """(async (label) => {
+  const l = [...document.querySelectorAll('[id$="_Label"]')].find((e) => e.textContent === label);
+  if (!l) throw new Error("label not found: " + label);
+  const t = document.querySelector(`[role=checkbox][aria-labelledby="${l.id}"]`);
+  t.click();
+  await new Promise((r) => setTimeout(r, 2500));
+  return t.getAttribute("aria-checked");
+})(%s)"""
+
+
 def main(argv: list[str]):
     if argv[:1] == ["targets"]:
         for t in targets():
@@ -120,6 +131,8 @@ def main(argv: list[str]):
         print(json.dumps(evaluate(argv[1], argv[2]), ensure_ascii=False, indent=2))
     elif argv[:1] == ["shot"] and len(argv) == 3:
         screenshot(argv[1], argv[2])
+    elif argv[:1] == ["toggle"] and len(argv) == 3:
+        print(evaluate(argv[1], CLICK_TOGGLE_JS % json.dumps(argv[2])))
     else:
         raise SystemExit(__doc__)
 
