@@ -1,7 +1,7 @@
 import { DropdownItem, PanelSection, PanelSectionRow, ToggleField } from "@decky/ui";
-import { useState } from "react";
-import { notifyError, setAutooff, setAutostart, setRunning, Status } from "../api";
+import { setAutooff, setAutostart, setRunning, Status } from "../api";
 import { formatClock, minutesUntil } from "../format";
+import { useAction } from "../useAction";
 
 const AUTOOFF_CHOICES = [
   { data: 0, label: "不自动关闭" },
@@ -14,19 +14,7 @@ const AUTOOFF_CHOICES = [
 const PENDING = -1;
 
 export function ServiceSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-
-  const apply = async (action: () => Promise<unknown>) => {
-    setBusy(true);
-    try {
-      await action();
-    } catch (e) {
-      notifyError(e);
-    } finally {
-      await refresh();
-      setBusy(false);
-    }
-  };
+  const { busy, run: apply } = useAction(refresh);
 
   const autooffAt = status.autooff_at;
   const autooffOptions = autooffAt
