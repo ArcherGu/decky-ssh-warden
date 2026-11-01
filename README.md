@@ -2,6 +2,8 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+[![CI](https://github.com/ArcherGu/decky-ssh-warden/actions/workflows/ci.yml/badge.svg)](https://github.com/ArcherGu/decky-ssh-warden/actions/workflows/ci.yml)
+
 A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for managing SSH on the Steam Deck from Game Mode. Turn SSH on or off, change its port, manage password login and keep SSH open only on networks you trust, all without switching to Desktop Mode or typing commands.
 
 ## Features
@@ -63,7 +65,10 @@ Then install it either way:
 ```bash
 pnpm build        # outputs dist/index.js
 pnpm typecheck
+pnpm test         # frontend and backend unit tests (the backend needs Python 3.10+)
 ```
+
+CI runs the typecheck, the tests, a translation check and the package build on every push.
 
 - Frontend: `src/` (React + `@decky/ui`), one file per panel section in `src/sections/`.
 - Backend: `main.py` only forwards calls; the logic lives in `py_modules/sshwarden/`. You can test it on the Deck without the UI:

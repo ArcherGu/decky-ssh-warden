@@ -2,6 +2,8 @@
 
 [English](README.md) | **简体中文**
 
+[![CI](https://github.com/ArcherGu/decky-ssh-warden/actions/workflows/ci.yml/badge.svg)](https://github.com/ArcherGu/decky-ssh-warden/actions/workflows/ci.yml)
+
 在 Steam Deck 的游戏模式下管理 SSH 服务的 [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) 插件。不用切到桌面模式、不用敲命令，就能开关 SSH、改端口、管密码，并且让 SSH 只在可信的网络上开放。
 
 ## 功能
@@ -63,7 +65,10 @@ pnpm package      # 生成 out/decky-ssh-warden.zip
 ```bash
 pnpm build        # 输出 dist/index.js
 pnpm typecheck
+pnpm test         # 前端和后端单元测试（后端需要 Python 3.10+）
 ```
+
+每次推送都会在 CI 中运行类型检查、测试、翻译检查和打包。
 
 - 前端：`src/`（React + `@decky/ui`），每个区块一个文件，放在 `src/sections/`。
 - 后端：`main.py` 只做转发，逻辑都在 `py_modules/sshwarden/`。可以不经过界面直接在 Deck 上测试：

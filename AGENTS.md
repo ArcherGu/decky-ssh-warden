@@ -71,6 +71,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - Passwords go to `chpasswd` on stdin only. They must never appear in command arguments, logs or return values.
 - Disabling password login needs at least one key, and removing the last key needs password login on. `keys.remove_key()` checks the second rule itself (it imports `sshd` inside the function because `sshd` imports `keys`).
 - Never read a private key into anything that is stored, logged or returned: `keys.import_file()` rejects files that look like one before parsing them.
+- **Never open a path the caller chose as root.** `keys.import_file()` reads the picked file as the deck user (`runuser -u deck -- head -c ...`); otherwise any local process could probe root-only files through the plugin.
 - **Never touch a path under `/home/deck` with plain `open()`, `chmod()` or `chown()`.** Those directories belong to deck, and anything running as deck could swap in a symlink to `/etc/shadow`. Use `safefile` (directory descriptors, `O_NOFOLLOW`, a random temporary name with `O_EXCL`, `fchmod`/`fchown`, only regular files read). Files the plugin creates there for the user, such as `~/.ssh` and `authorized_keys`, must belong to deck.
 - **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind. Decky also runs `_uninstall` before every update or reinstall (`browser._install()` → `uninstall_plugin()`), so if the user would want the setting back after an update, note it in `cleanup._note_settings()` and re-apply it in `cleanup._restore()` (idempotently: Decky starts a new plugin twice and kills the first process within seconds, so a restore may run again).
 - **Decky SIGKILLs a plugin 5 s after asking it to stop**, then deletes its directory. `_uninstall` therefore only calls `cleanup.start_uninstall()`, which copies the package to `/run/ssh-warden-uninstall` and runs `python3 -m sshwarden uninstall` from there as the transient service `ssh-warden-uninstall`. Keep `_uninstall` itself well under 5 s.
@@ -93,9 +94,13 @@ pnpm install
 pnpm typecheck    # tsc --noEmit
 pnpm build        # rollup → dist/index.js
 pnpm package      # build and package out/decky-ssh-warden.zip
-# Python can only be syntax-checked locally (parse only; py_compile would write .pyc files)
-python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' main.py py_modules/sshwarden/*.py dev/cdp.py
+pnpm test         # frontend (node --test) and backend (unittest) tests
+pnpm check:i18n   # every UserError code the backend raises is translated in both languages
 ```
+
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: frozen install, typecheck, frontend tests and `pnpm package`; backend tests and `check:i18n` on Python 3.14 (what Decky bundles); `bash -n` on the shell scripts. Keep it green.
+- The backend needs Python 3.10+. A stock macOS `python3` is 3.9, so point the scripts at a newer one: `PYTHON=/opt/homebrew/bin/python3.12 pnpm test`.
+- **Add tests with every change to backend logic.** `tests/backend/helpers.py` has `TempDirTest` (a real temporary directory, settings.json and lock file per test) and `FakeNetwork`, a fake firewalld + NetworkManager for `net.py`/`trust.py`; patch `run`/`succeeds` in the module under test rather than running system commands. Tests run unprivileged, so they cannot touch the system. Frontend tests live in `tests/frontend/*.test.ts` and import `src/` files with their `.ts` extension; Node runs them by stripping the types, so only erasable TypeScript syntax works there.
 
 - pnpm 12 no longer reads a `pnpm` field in `package.json`; those settings live in `pnpm-workspace.yaml`.
 - `tsconfig.json` needs `skipLibCheck`: the `@decky/api` type declarations reference `react-router`, which is not installed.
@@ -198,7 +203,7 @@ python3 cdp.py eval SharedJSContext 'DFL.Navigation.CloseSideMenus()'
 4. Add the wrapper in `src/api.ts`, then the section or dialog component, with its text in both languages in `src/i18n.ts`.
 5. Add the matching undo logic to `cleanup.revert_all()`.
 6. If the feature changes system state the watchdog does not cover, extend `dev/deck-guard/guard.sh` first.
-7. Run `pnpm typecheck`, test the backend CLI on a Deck with the watchdog installed, test the UI in both languages with `dev/cdp.py`, and confirm the watchdog reports `changed components: ''`.
+7. Add unit tests (see "Build and checks"), run `pnpm typecheck`, `pnpm test` and `pnpm check:i18n`, test the backend CLI on a Deck with the watchdog installed, test the UI in both languages with `dev/cdp.py`, and confirm the watchdog reports `changed components: ''`.
 8. Commit the feature on its own.
 
 ## Known TODOs
