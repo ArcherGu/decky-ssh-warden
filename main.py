@@ -41,8 +41,8 @@ class Plugin:
     async def set_password_auth(self, on: bool) -> dict:
         return await _call(sshd.set_password_auth, bool(on))
 
-    async def change_password(self, new_password: str) -> dict:
-        return await _call(account.change_password, str(new_password))
+    async def change_password(self, current_password: str, new_password: str) -> dict:
+        return await _call(account.change_password, str(current_password), str(new_password))
 
     async def import_keys(self, path: str) -> dict:
         return await _call(keys.import_file, str(path))

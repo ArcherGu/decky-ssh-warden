@@ -22,8 +22,8 @@ def main(argv: list[str]) -> int:
         "autooff": lambda minutes: sshd.schedule_autooff(int(minutes)) if minutes != "cancel" else sshd.cancel_autooff(),
         "port": lambda number: port.set_port(int(number)),
         "password-auth": lambda v: sshd.set_password_auth(on_off(v)),
-        # Reads the new password from stdin so it stays out of argv.
-        "passwd": lambda: account.change_password(sys.stdin.readline().rstrip("\n")),
+        # Reads the current and the new password from stdin (one per line) to keep them out of argv.
+        "passwd": lambda: account.change_password(sys.stdin.readline().rstrip("\n"), sys.stdin.readline().rstrip("\n")),
         "keys": lambda: keys.list_keys(),
         "key-import": lambda path: keys.import_file(path),
         "key-remove": lambda fingerprint: keys.remove_key(fingerprint),

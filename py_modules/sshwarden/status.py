@@ -1,4 +1,4 @@
-from . import DECK_USER, keys, net, settings, sshd
+from . import DECK_USER, account, keys, net, settings, sshd
 from .proc import CommandError
 
 
@@ -32,6 +32,7 @@ def collect() -> dict:
         "ports": listen_ports,
         "config_error": config_error,
         "password_auth": config.get("passwordauthentication", ["yes"])[0] == "yes",
+        "password_set": account.password_set(),
         "keys": keys.list_keys(),
         "sessions": sshd.sessions(listen_ports),
         "logins": sshd.login_history(),

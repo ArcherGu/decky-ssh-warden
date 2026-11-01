@@ -6,18 +6,21 @@ const MIN_LENGTH = 8;
 
 interface Props {
   user: string;
-  onSubmit: (password: string) => void;
+  /** Ask for the current password (required by the backend once one is set). */
+  askCurrent: boolean;
+  onSubmit: (current: string, password: string) => void;
   closeModal?: () => void;
 }
 
-export function PasswordModal({ user, onSubmit, closeModal }: Props) {
+export function PasswordModal({ user, askCurrent, onSubmit, closeModal }: Props) {
+  const [current, setCurrent] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 
   let problem = "";
   if (password.length > 0 && password.length < MIN_LENGTH) problem = t.login.tooShort(MIN_LENGTH);
   else if (confirm.length > 0 && confirm !== password) problem = t.login.mismatch;
-  const valid = password.length >= MIN_LENGTH && password === confirm;
+  const valid = (!askCurrent || current.length > 0) && password.length >= MIN_LENGTH && password === confirm;
 
   return (
     <ConfirmModal
@@ -29,11 +32,14 @@ export function PasswordModal({ user, onSubmit, closeModal }: Props) {
       // ConfirmModal does not close itself here, so close explicitly.
       onOK={() => {
         closeModal?.();
-        onSubmit(password);
+        onSubmit(current, password);
       }}
       onCancel={() => closeModal?.()}
       closeModal={closeModal}
     >
+      {askCurrent && (
+        <TextField label={t.login.currentPassword} bIsPassword value={current} onChange={(e) => setCurrent(e.target.value)} />
+      )}
       <TextField label={t.login.newPassword} bIsPassword value={password} onChange={(e) => setPassword(e.target.value)} />
       <TextField label={t.login.confirmPassword} bIsPassword value={confirm} onChange={(e) => setConfirm(e.target.value)} />
       {problem && <div style={{ color: "#e0a33b", marginTop: 8 }}>{problem}</div>}

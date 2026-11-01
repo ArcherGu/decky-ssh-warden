@@ -16,9 +16,9 @@ export function LoginSection({ status, refresh }: { status: Status; refresh: () 
   // Never offer to switch password login off when that would lock everyone out.
   const lockedOn = status.password_auth && status.keys.length === 0;
 
-  const submitPassword = (password: string) =>
+  const submitPassword = (current: string, password: string) =>
     run(async () => {
-      await changePassword(password);
+      await changePassword(current, password);
       toaster.toast({ title: "SSH Warden", body: t.login.passwordChanged(status.user) });
     });
 
@@ -37,7 +37,7 @@ export function LoginSection({ status, refresh }: { status: Status; refresh: () 
         <ButtonItem
           layout="below"
           disabled={busy}
-          onClick={() => showModal(<PasswordModal user={status.user} onSubmit={submitPassword} />)}
+          onClick={() => showModal(<PasswordModal user={status.user} askCurrent={status.password_set} onSubmit={submitPassword} />)}
         >
           {t.login.changePassword(status.user)}
         </ButtonItem>

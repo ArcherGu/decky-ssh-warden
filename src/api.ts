@@ -41,6 +41,8 @@ export interface Status {
   ports: number[];
   config_error: string | null;
   password_auth: boolean;
+  /** Whether the deck user has a password; changing it then needs the current one. */
+  password_set: boolean;
   keys: PublicKey[];
   sessions: string[];
   logins: { recent: Login[]; failed: number };
@@ -69,7 +71,7 @@ const setAutostartCall = callable<[on: boolean], Result<null>>("set_autostart");
 const setAutooffCall = callable<[minutes: number], Result<null>>("set_autooff");
 const setPortCall = callable<[port: number], Result<null>>("set_port");
 const setPasswordAuthCall = callable<[on: boolean], Result<null>>("set_password_auth");
-const changePasswordCall = callable<[newPassword: string], Result<null>>("change_password");
+const changePasswordCall = callable<[currentPassword: string, newPassword: string], Result<null>>("change_password");
 const importKeysCall = callable<[path: string], Result<{ added: number; skipped: number }>>("import_keys");
 const removeKeyCall = callable<[fingerprint: string], Result<null>>("remove_key");
 const setTrustedModeCall = callable<[on: boolean], Result<null>>("set_trusted_mode");
@@ -82,7 +84,8 @@ export const setAutostart = (on: boolean) => unwrap(setAutostartCall(on));
 export const setAutooff = (minutes: number) => unwrap(setAutooffCall(minutes));
 export const setPort = (port: number) => unwrap(setPortCall(port));
 export const setPasswordAuth = (on: boolean) => unwrap(setPasswordAuthCall(on));
-export const changePassword = (newPassword: string) => unwrap(changePasswordCall(newPassword));
+export const changePassword = (currentPassword: string, newPassword: string) =>
+  unwrap(changePasswordCall(currentPassword, newPassword));
 /** Add the public keys found in a file on the Deck. */
 export const importKeys = (path: string) => unwrap(importKeysCall(path));
 export const removeKey = (fingerprint: string) => unwrap(removeKeyCall(fingerprint));

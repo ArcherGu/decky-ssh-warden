@@ -47,10 +47,10 @@ def run(args: list[str], *, input: str | None = None, check: bool = True, timeou
     return proc.stdout
 
 
-def succeeds(args: list[str], timeout: float = 30) -> bool:
+def succeeds(args: list[str], *, input: str | None = None, timeout: float = 30) -> bool:
     try:
         return subprocess.run(
-            args, capture_output=True, env=_system_env(), timeout=timeout
+            args, input=input, capture_output=True, text=True, env=_system_env(), timeout=timeout
         ).returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         return False
