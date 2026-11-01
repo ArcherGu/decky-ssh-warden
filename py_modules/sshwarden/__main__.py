@@ -5,7 +5,7 @@
 import json
 import sys
 
-from . import account, cleanup, port, sshd, status, trust
+from . import account, cleanup, keys, port, sshd, status, trust
 
 
 def on_off(value: str) -> bool:
@@ -24,6 +24,9 @@ def main(argv: list[str]) -> int:
         "password-auth": lambda v: sshd.set_password_auth(on_off(v)),
         # Reads the new password from stdin so it stays out of argv.
         "passwd": lambda: account.change_password(sys.stdin.readline().rstrip("\n")),
+        "keys": lambda: keys.list_keys(),
+        "key-import": lambda path: keys.import_file(path),
+        "key-remove": lambda fingerprint: keys.remove_key(fingerprint),
         "trusted-mode": lambda v: trust.set_enabled(on_off(v)),
         "trust": lambda uuid, v: trust.set_network_trusted(uuid, on_off(v)),
         "cleanup": lambda: cleanup.revert_all(),

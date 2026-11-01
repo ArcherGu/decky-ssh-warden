@@ -6,14 +6,15 @@ import { t } from "../i18n";
 import { useAction } from "../useAction";
 
 function passwordAuthHint(status: Status) {
-  if (status.key_count === 0) return t.login.noKeys;
-  return status.password_auth ? t.login.keysWithPassword(status.key_count) : t.login.keysOnly(status.key_count);
+  const count = status.keys.length;
+  if (count === 0) return t.login.noKeys;
+  return status.password_auth ? t.login.keysWithPassword(count) : t.login.keysOnly(count);
 }
 
 export function LoginSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
   const { busy, run } = useAction(refresh);
   // Never offer to switch password login off when that would lock everyone out.
-  const lockedOn = status.password_auth && status.key_count === 0;
+  const lockedOn = status.password_auth && status.keys.length === 0;
 
   const submitPassword = (password: string) =>
     run(async () => {

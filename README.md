@@ -12,6 +12,7 @@ A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for m
 | Status | Current network with a ready-to-use connection command, whether SSH is reachable on it, active sessions, failed login attempts in the last 24 hours, most recent login |
 | Connection | Change the SSH port |
 | Login security | Allow or disallow password login; change the `deck` user's password |
+| Public keys | List the keys that can log in and remove any of them; import keys from a `.pub` file picked on the Deck (e.g. from a USB drive or SD card); shows the `ssh-copy-id` command to run on your computer |
 | Trusted networks | Keep SSH open only on the networks you tick; every other network (e.g. public Wi-Fi) is blocked by the firewall |
 
 The panel follows Steam's language: Simplified Chinese when Steam is set to it, English otherwise.
@@ -21,11 +22,12 @@ Turning SSH off, by hand or with the auto-off timer, only stops new connections:
 ## Safety by design
 
 - **Changing settings cannot lock you out.** The plugin only writes its own sshd drop-in, `/etc/ssh/sshd_config.d/05-ssh-warden.conf`, and never touches the main config. Every change is validated with `sshd -t`, and sshd must come back listening on the expected port; if any step fails, the previous configuration is restored automatically.
-- **No password-login switch-off without keys.** While `~/.ssh/authorized_keys` has no keys, the backend refuses to disable password login and the toggle is disabled.
+- **No password-login switch-off without keys, and no removing the last key without password login.** Either would leave no way to log in, so the backend refuses and the controls are disabled.
+- **Private keys are rejected.** Picking a private key file by mistake gives an error; its content is never stored or logged. `authorized_keys` is replaced atomically, and the plugin creates `~/.ssh` and the file with the permissions sshd expects.
 - **Passwords are never logged.** The new password is passed to `chpasswd` on stdin, so it never appears in process arguments or logs.
 - **Invisible on public networks.** With "SSH only on trusted networks" on, trusted networks are moved to a dedicated firewall zone, `sshwarden` (a copy of the default zone, so streaming and other features keep working). All other networks drop the SSH port, so a port scan shows nothing there.
 - **Every firewall rule is accounted for.** Each rule the plugin adds is recorded in `~/homebrew/settings/decky-ssh-warden/settings.json`. When the port or mode changes, new rules are added before old ones are removed, so there is no gap and nothing is left behind.
-- **Uninstalling restores the system.** Removing the plugin turns trusted mode off, deletes every firewall rule and the sshd drop-in it created, and cancels a pending auto-off. SSH returns to the system defaults (port 22, password login allowed).
+- **Uninstalling restores the system.** Removing the plugin turns trusted mode off, deletes every firewall rule and the sshd drop-in it created, and cancels a pending auto-off. SSH returns to the system defaults (port 22, password login allowed). Your public keys are yours, so they are kept.
 - **Polling only while the panel is open.** Closing the Quick Access Menu stops all background work.
 
 The plugin runs as `root` (`flags: ["root"]` in `plugin.json`), because managing sshd, changing passwords and configuring the firewall all require it.
@@ -33,7 +35,6 @@ The plugin runs as `root` (`flags: ["root"]` in `plugin.json`), because managing
 ## Known limitations
 
 - Only two sshd settings are managed: the port and password login. Finer options such as `AllowUsers` are not handled.
-- Public keys are only counted. To add or remove keys, edit `~/.ssh/authorized_keys` in Desktop Mode.
 - Auto-off uses a transient systemd timer, so it does not survive a reboot of the Deck.
 
 ## Installation

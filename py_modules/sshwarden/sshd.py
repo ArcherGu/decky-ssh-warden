@@ -3,8 +3,8 @@ import os
 import re
 import time
 
-from .account import has_authorized_keys
 from .errors import UserError
+from .keys import has_authorized_keys
 from .proc import run
 
 UNIT = "sshd.service"
@@ -107,6 +107,10 @@ def update_config(changes: dict[str, str | None]) -> None:
         if was_running:
             run(["systemctl", "restart", UNIT], check=False)
         raise
+
+
+def password_auth_enabled() -> bool:
+    return effective_config().get("passwordauthentication", ["yes"])[0] == "yes"
 
 
 def set_password_auth(on: bool) -> None:

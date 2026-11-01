@@ -2,7 +2,7 @@ import asyncio
 
 import decky
 
-from sshwarden import account, cleanup, port, settings, sshd, status, trust
+from sshwarden import account, cleanup, keys, port, settings, sshd, status, trust
 from sshwarden.errors import UserError
 
 
@@ -43,6 +43,12 @@ class Plugin:
 
     async def change_password(self, new_password: str) -> dict:
         return await _call(account.change_password, str(new_password))
+
+    async def import_keys(self, path: str) -> dict:
+        return await _call(keys.import_file, str(path))
+
+    async def remove_key(self, fingerprint: str) -> dict:
+        return await _call(keys.remove_key, str(fingerprint))
 
     async def set_trusted_mode(self, on: bool) -> dict:
         return await _call(trust.set_enabled, bool(on))

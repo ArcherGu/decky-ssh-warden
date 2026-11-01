@@ -20,6 +20,12 @@ export interface SavedNetwork {
   trusted: boolean;
 }
 
+export interface PublicKey {
+  type: string;
+  comment: string;
+  fingerprint: string;
+}
+
 export interface Login {
   time: number;
   method: string;
@@ -35,7 +41,7 @@ export interface Status {
   ports: number[];
   config_error: string | null;
   password_auth: boolean;
-  key_count: number;
+  keys: PublicKey[];
   sessions: string[];
   logins: { recent: Login[]; failed: number };
   firewall: boolean;
@@ -64,6 +70,8 @@ const setAutooffCall = callable<[minutes: number], Result<null>>("set_autooff");
 const setPortCall = callable<[port: number], Result<null>>("set_port");
 const setPasswordAuthCall = callable<[on: boolean], Result<null>>("set_password_auth");
 const changePasswordCall = callable<[newPassword: string], Result<null>>("change_password");
+const importKeysCall = callable<[path: string], Result<{ added: number; skipped: number }>>("import_keys");
+const removeKeyCall = callable<[fingerprint: string], Result<null>>("remove_key");
 const setTrustedModeCall = callable<[on: boolean], Result<null>>("set_trusted_mode");
 const setNetworkTrustedCall = callable<[uuid: string, on: boolean], Result<null>>("set_network_trusted");
 
@@ -75,5 +83,8 @@ export const setAutooff = (minutes: number) => unwrap(setAutooffCall(minutes));
 export const setPort = (port: number) => unwrap(setPortCall(port));
 export const setPasswordAuth = (on: boolean) => unwrap(setPasswordAuthCall(on));
 export const changePassword = (newPassword: string) => unwrap(changePasswordCall(newPassword));
+/** Add the public keys found in a file on the Deck. */
+export const importKeys = (path: string) => unwrap(importKeysCall(path));
+export const removeKey = (fingerprint: string) => unwrap(removeKeyCall(fingerprint));
 export const setTrustedMode = (on: boolean) => unwrap(setTrustedModeCall(on));
 export const setNetworkTrusted = (uuid: string, on: boolean) => unwrap(setNetworkTrustedCall(uuid, on));

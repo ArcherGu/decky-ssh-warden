@@ -58,7 +58,7 @@ const en = {
   login: {
     title: "Login",
     passwordAuth: "Allow password login",
-    noKeys: "No SSH public key yet. Add one before turning password login off.",
+    noKeys: "No SSH public key yet. Add one below before turning password login off.",
     keysWithPassword: (n: number) =>
       `${n === 1 ? "1 public key" : `${n} public keys`} set up. Turn off to allow key login only.`,
     keysOnly: (n: number) => `Key login only (${n === 1 ? "1 public key" : `${n} public keys`})`,
@@ -71,6 +71,24 @@ const en = {
     tooShort: (min: number) => `Use at least ${min} characters`,
     mismatch: "The passwords don't match",
     submit: "Change password",
+  },
+
+  keys: {
+    title: "Public Keys",
+    none: "No public keys yet",
+    unnamed: "Unnamed key",
+    remove: "Remove",
+    lastKeyLocked: "Password login is off, so the last key can't be removed",
+    removeTitle: (name: string) => `Remove "${name}"?`,
+    removeBody: (fingerprint: string) =>
+      `Devices using this key will no longer be able to log in over SSH (open connections stay). Fingerprint: ${fingerprint}`,
+    importFile: "Import from file",
+    copyIdHint: (command: string) => `Or run this on your computer: ${command}`,
+    fileHint: "Pick a .pub file. Copy it to the Deck first, e.g. on a USB drive or SD card.",
+    imported: (added: number, skipped: number) =>
+      added === 0
+        ? "Every key in this file is already set up"
+        : `Added ${added === 1 ? "1 public key" : `${added} public keys`}${skipped ? `; ${skipped} already set up` : ""}`,
   },
 
   trusted: {
@@ -104,6 +122,11 @@ const en = {
     no_authorized_keys: () => "No SSH public key is set up; without password login nobody could log in over SSH",
     autooff_range: (p) => `Auto-off must be 1 to ${p.max} minutes away`,
     firewall_not_running: () => "The firewall (firewalld) is not running, so SSH can't be limited by network",
+    key_file_unreadable: (p) => `Can't read ${p.file}: ${p.reason}`,
+    key_file_private: (p) => `${p.file} is a private key; pick the matching .pub file`,
+    key_file_invalid: (p) => `${p.file} contains no SSH public key`,
+    key_not_found: () => "This public key no longer exists",
+    last_key: () => "This is the last public key and password login is off; removing it would lock everyone out",
   } as ErrorMessages,
 };
 
@@ -158,7 +181,7 @@ const zhCN: typeof en = {
   login: {
     title: "登录安全",
     passwordAuth: "允许密码登录",
-    noKeys: "未配置 SSH 公钥，需先添加公钥才能关闭密码登录",
+    noKeys: "未配置 SSH 公钥，需先在下方添加公钥才能关闭密码登录",
     keysWithPassword: (n) => `已配置 ${n} 个公钥，关闭后只能用公钥登录`,
     keysOnly: (n) => `只允许公钥登录（已配置 ${n} 个公钥）`,
     changePassword: (user) => `修改 ${user} 密码`,
@@ -170,6 +193,21 @@ const zhCN: typeof en = {
     tooShort: (min) => `密码至少需要 ${min} 个字符`,
     mismatch: "两次输入的密码不一致",
     submit: "修改密码",
+  },
+
+  keys: {
+    title: "公钥",
+    none: "还没有公钥",
+    unnamed: "未命名公钥",
+    remove: "删除",
+    lastKeyLocked: "密码登录已关闭，不能删除最后一个公钥",
+    removeTitle: (name) => `删除「${name}」？`,
+    removeBody: (fingerprint) => `使用这个公钥的设备将无法再通过 SSH 登录（已建立的连接不受影响）。指纹：${fingerprint}`,
+    importFile: "从文件导入",
+    copyIdHint: (command) => `也可以在电脑上运行：${command}`,
+    fileHint: "选择 .pub 文件。可以先用 U 盘或 SD 卡拷到 Deck 上。",
+    imported: (added, skipped) =>
+      added === 0 ? "文件里的公钥都已存在" : `已添加 ${added} 个公钥${skipped ? `，${skipped} 个已存在` : ""}`,
   },
 
   trusted: {
@@ -200,6 +238,11 @@ const zhCN: typeof en = {
     no_authorized_keys: () => "还没有配置 SSH 公钥，关闭密码登录后将无法再通过 SSH 登录",
     autooff_range: (p) => `自动关闭时间需在 1 到 ${p.max} 分钟之间`,
     firewall_not_running: () => "防火墙（firewalld）没有运行，无法按网络限制 SSH",
+    key_file_unreadable: (p) => `无法读取 ${p.file}：${p.reason}`,
+    key_file_private: (p) => `${p.file} 是私钥，请选择对应的 .pub 文件`,
+    key_file_invalid: (p) => `${p.file} 里没有 SSH 公钥`,
+    key_not_found: () => "这个公钥已经不存在了",
+    last_key: () => "这是最后一个公钥，而且密码登录已关闭，删除后将无法再通过 SSH 登录",
   },
 };
 
