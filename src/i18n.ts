@@ -135,7 +135,7 @@ const en = {
     key_file_invalid: (p) => `${p.file} contains no SSH public key`,
     key_not_found: () => "This public key no longer exists",
     last_key: () => "This is the last public key and password login is off; removing it would lock everyone out",
-  } as ErrorMessages,
+  } satisfies ErrorMessages,
 };
 
 const zhCN: typeof en = {
@@ -273,6 +273,6 @@ export const t = locale.startsWith("zh-cn") || locale.startsWith("zh-hans") ? zh
 
 /** A backend error in the panel's language; unknown codes fall back to the backend's English text. */
 export function errorMessage(code: string | undefined, params: Params | undefined, fallback: string) {
-  const message = code ? t.errors[code] : undefined;
+  const message = code ? (t.errors as ErrorMessages)[code] : undefined;
   return message ? message(params ?? {}) : fallback;
 }
