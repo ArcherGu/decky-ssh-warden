@@ -5,7 +5,7 @@ import time
 
 from .errors import UserError
 from .keys import has_authorized_keys
-from .proc import run
+from .proc import CommandError, run
 
 UNIT = "sshd.service"
 AUTOOFF_UNIT = "ssh-warden-autooff"
@@ -17,10 +17,26 @@ MANAGED_KEYS = ("Port", "PasswordAuthentication")
 DEFAULT_PORT = 22
 
 
+def _sshd_test(flag: str) -> str:
+    """Run `sshd -T` or `sshd -t`.
+
+    Both refuse to run without host keys ("no hostkeys available"). SteamOS only creates them
+    when sshd first starts (sshdgenkeys.service runs `ssh-keygen -A`), so on a Deck where SSH
+    was never turned on, create them the same way and try again.
+    """
+    try:
+        return run(["sshd", flag])
+    except CommandError as e:
+        if "no hostkeys available" not in e.params["detail"]:
+            raise
+    run(["ssh-keygen", "-A"])
+    return run(["sshd", flag])
+
+
 def effective_config() -> dict[str, list[str]]:
     """The configuration sshd would actually use (`sshd -T`), keys lower-cased."""
     config: dict[str, list[str]] = {}
-    for line in run(["sshd", "-T"]).splitlines():
+    for line in _sshd_test("-T").splitlines():
         key, _, value = line.partition(" ")
         config.setdefault(key.lower(), []).append(value)
     return config
@@ -84,7 +100,7 @@ def update_config(changes: dict[str, str | None]) -> None:
     was_running = service_state()["running"]
     _write_dropin(values)
     try:
-        run(["sshd", "-t"])
+        _sshd_test("-t")
         if was_running:
             run(["systemctl", "restart", UNIT])
             expected = ports(effective_config())
