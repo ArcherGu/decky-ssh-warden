@@ -242,17 +242,23 @@ def sessions(listen_ports: list[int]) -> list[str]:
     return peers
 
 
-_ACCEPTED = re.compile(r"Accepted (\S+) for (\S+) from (\S+) port")
-_FAILED = re.compile(r"Failed \S+ for (?:invalid user )?(\S+) from (\S+) port|Invalid user (\S*) from (\S+) port")
+_ACCEPTED = re.compile(r"Accepted (\S+) for (\S+) from (\S+) port (\d+)")
+# One failed connection logs several of these ("Invalid user", "Failed none for invalid user",
+# "Failed password ..."), all with the client's address and source port.
+_FAILED = re.compile(r"(?:Failed \S+ for |Invalid user ).*? from (\S+) port (\d+)")
 
 
 def login_history(hours: int = 24, recent: int = 3) -> dict:
-    """Successful logins (most recent first) and failed attempts within the last `hours`."""
+    """Successful logins (most recent first) and failed logins within the last `hours`.
+
+    A failed login is a connection that logged a failure and never got in, counted once
+    however many lines or attempts it produced.
+    """
     out = run(
         ["journalctl", "-u", UNIT, "--since", f"-{hours}h", "--no-pager", "-o", "short-unix"],
         check=False,
     )
-    accepted, failed = [], 0
+    accepted, succeeded, failed = [], set(), set()
     for line in out.splitlines():
         if m := _ACCEPTED.search(line):
             accepted.append({
@@ -261,6 +267,7 @@ def login_history(hours: int = 24, recent: int = 3) -> dict:
                 "user": m.group(2),
                 "from": m.group(3),
             })
-        elif _FAILED.search(line):
-            failed += 1
-    return {"recent": accepted[::-1][:recent], "failed": failed}
+            succeeded.add((m.group(3), m.group(4)))
+        elif m := _FAILED.search(line):
+            failed.add((m.group(1), m.group(2)))
+    return {"recent": accepted[::-1][:recent], "failed": len(failed - succeeded)}
