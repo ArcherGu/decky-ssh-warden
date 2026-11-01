@@ -1,28 +1,23 @@
 import asyncio
-import threading
 
 import decky
 
-from sshwarden import account, cleanup, keys, port, settings, sshd, status, trust
+from sshwarden import account, cleanup, keys, lock, port, settings, sshd, status, trust
 from sshwarden.errors import UserError
 
 
-# Changes run one at a time. Each panel section only disables its own controls, and Decky runs
-# calls concurrently, so without this two changes could overwrite each other's settings.json
-# (losing firewall records) or both pass checks meant to be exclusive (last key vs. password
-# login).
-_changes = threading.Lock()
-
-
 def _exclusive(fn, *args):
-    with _changes:
+    # Changes run one at a time (see lock.py): otherwise two could overwrite each other's
+    # settings.json (losing firewall records) or both pass checks meant to be exclusive
+    # (last key vs. password login).
+    with lock.changes():
         return fn(*args)
 
 
 async def _call(fn, *args, exclusive: bool = True) -> dict:
     """Run a blocking backend function off the event loop; report errors to the UI as data.
 
-    Only reads may pass exclusive=False.
+    Only reads, and functions that take lock.changes() themselves, may pass exclusive=False.
     """
     try:
         if exclusive:
@@ -79,7 +74,7 @@ class Plugin:
     async def _main(self):
         settings.init(decky.DECKY_PLUGIN_SETTINGS_DIR)
         decky.logger.info("SSH Warden loaded")
-        restored = await _call(cleanup.restore_after_update)
+        restored = await _call(cleanup.restore_after_update, exclusive=False)
         if restored.get("data"):
             decky.logger.info("Settings put back after an update: %s", restored["data"])
 
@@ -88,6 +83,11 @@ class Plugin:
 
     async def _uninstall(self):
         # Leave no orphaned firewall zone/rules or sshd drop-in behind. Decky also calls this
-        # before an update; the new version then puts the settings back (see cleanup.py).
-        result = await _call(cleanup.uninstall)
-        decky.logger.info("SSH Warden uninstalled, cleanup: %s", result)
+        # before an update; the new version then puts the settings back. It kills this process
+        # within 5 s, so the work runs in a background service (see cleanup.py).
+        # Not behind the change lock: a change still running must not use up those 5 s.
+        result = await _call(cleanup.start_uninstall, decky.DECKY_PLUGIN_SETTINGS_DIR, exclusive=False)
+        if not result["ok"]:
+            # Best effort if the service could not start (uninstall() takes the lock itself).
+            result = await _call(cleanup.uninstall, exclusive=False)
+        decky.logger.info("SSH Warden uninstall: %s", result)

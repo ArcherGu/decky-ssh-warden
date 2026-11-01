@@ -18,6 +18,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 | `main.py` | Decky backend entry point. It only forwards: every method is `return await _call(fn, *args)` |
 | `py_modules/sshwarden/proc.py` | The only place that runs system commands: `run()`, `succeeds()`, `split_terse()` |
 | `py_modules/sshwarden/safefile.py` | Reading and writing files under `/home/deck` as root without following symlinks |
+| `py_modules/sshwarden/lock.py` | `changes()`: the cross-process lock every system change holds |
 | `py_modules/sshwarden/errors.py` | `UserError`: an error for the user, with a code the panel translates |
 | `py_modules/sshwarden/sshd.py` | sshd service state, on/off, auto-off timer, config read/write (drop-in + validation + rollback), login history |
 | `py_modules/sshwarden/net.py` | NetworkManager connections, firewalld zones and rules, `sync_ssh_firewall()`, `zones_snapshot()` |
@@ -42,7 +43,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 - **Run system commands only through `proc.run()`**, never `subprocess` directly. Decky is a PyInstaller app that points `LD_LIBRARY_PATH` at its bundled libraries, which makes system programs such as `sshd`, `bash` and `nmcli` fail to start; `run()` cleans that up. It also pins `LC_ALL=C` and `PATH` so output stays parseable.
 - Backend functions are synchronous. `_call()` in `main.py` runs them with `asyncio.to_thread` and returns `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`. For errors the user should see, `raise UserError("<code>", "<English message with {params}>", **params)`; `_call()` adds `code` and `params` to the result and the panel shows the translation of that code from `errors` in `src/i18n.ts`, falling back to the English message. `CommandError`, raised by `proc.run()`, is a `UserError` with the code `command_failed`.
-- **Every method that changes something holds the global lock in `main.py`** (`_call()` takes it unless `exclusive=False`, which only the status read uses). Panel sections only disable their own controls, so without it two changes would race on `settings.json` and on checks that must be atomic.
+- **Every change holds `lock.changes()`**, an `flock` on `/run/ssh-warden.lock`. `_call()` takes it unless `exclusive=False` (only for reads and for functions that take it themselves; taking it twice in one process deadlocks), and the CLI takes it for its change commands. Panel sections only disable their own controls, and during an update the old plugin, the background uninstall and two new plugin processes overlap, so without it changes would race on `settings.json` and on checks that must be atomic.
 - **The system is the source of truth**, not `settings.json`. Settings only store two kinds of data: changes the plugin made (so they can be undone) and user preferences (the trusted-network list).
 - Known parsing pitfalls:
   - `sshd -T` prints keys in mixed case (e.g. `PasswordAuthentication yes`); `effective_config()` lower-cases them.
@@ -71,7 +72,8 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - Disabling password login needs at least one key, and removing the last key needs password login on. `keys.remove_key()` checks the second rule itself (it imports `sshd` inside the function because `sshd` imports `keys`).
 - Never read a private key into anything that is stored, logged or returned: `keys.import_file()` rejects files that look like one before parsing them.
 - **Never touch a path under `/home/deck` with plain `open()`, `chmod()` or `chown()`.** Those directories belong to deck, and anything running as deck could swap in a symlink to `/etc/shadow`. Use `safefile` (directory descriptors, `O_NOFOLLOW`, a random temporary name with `O_EXCL`, `fchmod`/`fchown`, only regular files read). Files the plugin creates there for the user, such as `~/.ssh` and `authorized_keys`, must belong to deck.
-- **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind. Decky also runs `_uninstall` before every update or reinstall (`browser._install()` → `uninstall_plugin()`), so if the user would want the setting back after an update, note it in `cleanup.uninstall()` and re-apply it in `cleanup.restore_after_update()`.
+- **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind. Decky also runs `_uninstall` before every update or reinstall (`browser._install()` → `uninstall_plugin()`), so if the user would want the setting back after an update, note it in `cleanup._note_settings()` and re-apply it in `cleanup._restore()` (idempotently: Decky starts a new plugin twice and kills the first process within seconds, so a restore may run again).
+- **Decky SIGKILLs a plugin 5 s after asking it to stop**, then deletes its directory. `_uninstall` therefore only calls `cleanup.start_uninstall()`, which copies the package to `/run/ssh-warden-uninstall` and runs `python3 -m sshwarden uninstall` from there as the transient service `ssh-warden-uninstall`. Keep `_uninstall` itself well under 5 s.
 
 ## Frontend conventions
 
@@ -132,7 +134,8 @@ Before any test that could affect SSH access (stopping sshd, changing the port o
   sudo python3 -B -m sshwarden keys
   sudo python3 -B -m sshwarden key-import /path/to/key.pub
   sudo python3 -B -m sshwarden key-remove SHA256:<fingerprint>
-  sudo python3 -B -m sshwarden cleanup
+  sudo python3 -B -m sshwarden cleanup      # revert everything
+  sudo python3 -B -m sshwarden uninstall    # note the settings, then revert (what _uninstall runs)
   ```
 
 - **Established SSH sessions survive sshd stops, restarts and firewall changes.** Do "stop → check → start again" tests inside a single SSH session.
