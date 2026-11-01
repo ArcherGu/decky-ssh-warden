@@ -1,6 +1,7 @@
 import { ButtonItem, Field, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
 import { setPort, Status } from "../api";
 import { PortModal } from "../components/PortModal";
+import { t } from "../i18n";
 import { useAction } from "../useAction";
 
 export function ConnectionSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
@@ -8,9 +9,9 @@ export function ConnectionSection({ status, refresh }: { status: Status; refresh
   const port = status.ports[0] ?? 22;
 
   return (
-    <PanelSection title="连接设置">
+    <PanelSection title={t.connection.title}>
       <PanelSectionRow>
-        <Field label="端口" bottomSeparator="none">
+        <Field label={t.connection.port} bottomSeparator="none">
           {status.ports.join(", ")}
         </Field>
       </PanelSectionRow>
@@ -20,7 +21,7 @@ export function ConnectionSection({ status, refresh }: { status: Status; refresh
           disabled={busy}
           onClick={() => showModal(<PortModal current={port} onSubmit={(p) => run(() => setPort(p))} />)}
         >
-          修改端口
+          {t.connection.changePort}
         </ButtonItem>
       </PanelSectionRow>
     </PanelSection>

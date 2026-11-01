@@ -14,6 +14,8 @@ A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for m
 | Login security | Allow or disallow password login; change the `deck` user's password |
 | Trusted networks | Keep SSH open only on the networks you tick; every other network (e.g. public Wi-Fi) is blocked by the firewall |
 
+The panel follows Steam's language: Simplified Chinese when Steam is set to it, English otherwise.
+
 ## Safety by design
 
 - **Changing settings cannot lock you out.** The plugin only writes its own sshd drop-in, `/etc/ssh/sshd_config.d/05-ssh-warden.conf`, and never touches the main config. Every change is validated with `sshd -t`, and sshd must come back listening on the expected port; if any step fails, the previous configuration is restored automatically.

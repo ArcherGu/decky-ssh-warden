@@ -1,5 +1,6 @@
 import { ConfirmModal, TextField } from "@decky/ui";
 import { useState } from "react";
+import { t } from "../i18n";
 
 interface Props {
   current: number;
@@ -14,10 +15,10 @@ export function PortModal({ current, onSubmit, closeModal }: Props) {
 
   return (
     <ConfirmModal
-      strTitle="修改 SSH 端口"
-      strDescription="保存后 SSH 会立即切换到新端口，已建立的连接不受影响。新配置无法启动时会自动恢复原端口。"
-      strOKButtonText="保存"
-      strCancelButtonText="取消"
+      strTitle={t.connection.modalTitle}
+      strDescription={t.connection.modalDescription}
+      strOKButtonText={t.connection.save}
+      strCancelButtonText={t.cancel}
       bOKDisabled={!valid || port === current}
       // ConfirmModal does not close itself here, so close explicitly.
       onOK={() => {
@@ -28,7 +29,7 @@ export function PortModal({ current, onSubmit, closeModal }: Props) {
       closeModal={closeModal}
     >
       <TextField
-        label="端口（1-65535，默认 22）"
+        label={t.connection.portLabel}
         value={value}
         mustBeNumeric
         rangeMin={1}

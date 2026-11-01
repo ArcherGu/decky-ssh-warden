@@ -1,4 +1,5 @@
 import { callable, toaster } from "@decky/api";
+import { errorMessage } from "./i18n";
 
 export interface Network {
   name: string;
@@ -43,11 +44,12 @@ export interface Status {
   saved_networks: SavedNetwork[];
 }
 
-type Result<T> = { ok: true; data: T } | { ok: false; error: string };
+type Failure = { ok: false; error: string; code?: string; params?: Record<string, string | number> };
+type Result<T> = { ok: true; data: T } | Failure;
 
 async function unwrap<T>(result: Promise<Result<T>>): Promise<T> {
   const r = await result;
-  if (!r.ok) throw new Error(r.error);
+  if (!r.ok) throw new Error(errorMessage(r.code, r.params, r.error));
   return r.data;
 }
 

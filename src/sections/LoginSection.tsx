@@ -2,13 +2,12 @@ import { ButtonItem, PanelSection, PanelSectionRow, showModal, ToggleField } fro
 import { toaster } from "@decky/api";
 import { changePassword, setPasswordAuth, Status } from "../api";
 import { PasswordModal } from "../components/PasswordModal";
+import { t } from "../i18n";
 import { useAction } from "../useAction";
 
 function passwordAuthHint(status: Status) {
-  if (status.key_count === 0) return "未配置 SSH 公钥，需先添加公钥才能关闭密码登录";
-  return status.password_auth
-    ? `已配置 ${status.key_count} 个公钥，关闭后只能用公钥登录`
-    : `只允许公钥登录（已配置 ${status.key_count} 个公钥）`;
+  if (status.key_count === 0) return t.login.noKeys;
+  return status.password_auth ? t.login.keysWithPassword(status.key_count) : t.login.keysOnly(status.key_count);
 }
 
 export function LoginSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
@@ -19,14 +18,14 @@ export function LoginSection({ status, refresh }: { status: Status; refresh: () 
   const submitPassword = (password: string) =>
     run(async () => {
       await changePassword(password);
-      toaster.toast({ title: "SSH Warden", body: `${status.user} 的密码已修改` });
+      toaster.toast({ title: "SSH Warden", body: t.login.passwordChanged(status.user) });
     });
 
   return (
-    <PanelSection title="登录安全">
+    <PanelSection title={t.login.title}>
       <PanelSectionRow>
         <ToggleField
-          label="允许密码登录"
+          label={t.login.passwordAuth}
           description={passwordAuthHint(status)}
           checked={status.password_auth}
           disabled={busy || lockedOn}
@@ -39,7 +38,7 @@ export function LoginSection({ status, refresh }: { status: Status; refresh: () 
           disabled={busy}
           onClick={() => showModal(<PasswordModal user={status.user} onSubmit={submitPassword} />)}
         >
-          修改 {status.user} 密码
+          {t.login.changePassword(status.user)}
         </ButtonItem>
       </PanelSectionRow>
     </PanelSection>

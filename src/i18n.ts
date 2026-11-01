@@ -1,0 +1,220 @@
+/**
+ * All text shown in the panel. The language follows Steam's: Simplified Chinese when Steam
+ * is set to it, English for every other language.
+ */
+
+type Params = Record<string, string | number>;
+type ErrorMessages = Record<string, (p: Params) => string>;
+
+const en = {
+  loading: "Reading SSH status…",
+  loadFailed: (error: string) => `Couldn't read the SSH status: ${error}`,
+  cancel: "Cancel",
+  listSeparator: ", ",
+
+  service: {
+    title: "SSH Service",
+    enable: "Enable SSH",
+    running: "Running. Turning it off keeps open connections.",
+    stopped: "Stopped",
+    autooff: "Turn off automatically",
+    autooffHint: "Stops accepting new connections at the chosen time; open ones stay",
+    autooffAt: (clock: string) => `SSH turns off at ${clock}; open connections stay`,
+    never: "Never",
+    afterMinutes: (minutes: number) => `In ${minutes} minutes`,
+    afterHours: (hours: number) => (hours === 1 ? "In 1 hour" : `In ${hours} hours`),
+    remaining: (minutes: number) => `${minutes} min left`,
+    autostart: "Start on boot",
+  },
+
+  status: {
+    title: "Status",
+    configError: "Config error",
+    network: "Network",
+    notConnected: "Not connected",
+    noIPv4: "No IPv4 address",
+    reachable: "Reachable",
+    blocked: "Blocked",
+    sessions: "Connections",
+    sessionCount: (n: number) => String(n),
+    failedLogins: "Failed logins (24 h)",
+    failedCount: (n: number) => String(n),
+    lastLogin: "Last login",
+    loginFrom: (user: string, from: string) => `${user} from ${from}`,
+    none: "None",
+  },
+
+  connection: {
+    title: "Connection",
+    port: "Port",
+    changePort: "Change port",
+    modalTitle: "Change SSH port",
+    modalDescription:
+      "SSH restarts on the new port right away; open connections stay. If it can't start, the old port is restored.",
+    portLabel: "Port (1-65535, default 22)",
+    save: "Save",
+  },
+
+  login: {
+    title: "Login",
+    passwordAuth: "Allow password login",
+    noKeys: "No SSH public key yet. Add one before turning password login off.",
+    keysWithPassword: (n: number) =>
+      `${n === 1 ? "1 public key" : `${n} public keys`} set up. Turn off to allow key login only.`,
+    keysOnly: (n: number) => `Key login only (${n === 1 ? "1 public key" : `${n} public keys`})`,
+    changePassword: (user: string) => `Change ${user}'s password`,
+    passwordChanged: (user: string) => `Password for ${user} changed`,
+    modalTitle: (user: string) => `Change password for ${user}`,
+    modalDescription: "This is also the password for sudo and Desktop Mode. Open SSH connections stay.",
+    newPassword: "New password",
+    confirmPassword: "Repeat new password",
+    tooShort: (min: number) => `Use at least ${min} characters`,
+    mismatch: "The passwords don't match",
+    submit: "Change password",
+  },
+
+  trusted: {
+    title: "Trusted Networks",
+    mode: "SSH on trusted networks only",
+    busy: "Configuring the firewall, this takes a few seconds…",
+    noFirewall: "The firewall (firewalld) is not running, so this is unavailable",
+    onHint: "Only the networks checked below can reach SSH; others (like public Wi-Fi) are blocked by the firewall",
+    offHint: "When on, only the networks checked below can reach SSH",
+    wifi: "Wi-Fi",
+    ethernet: "Ethernet",
+    connected: "Connected",
+    enableTitle: "This network is not trusted",
+    enableBody: (names: string) =>
+      `New SSH connections from "${names}" will be blocked (open connections stay). Turn it on anyway?`,
+    enableOk: "Turn on",
+    untrustTitle: (name: string) => `Stop trusting "${name}"?`,
+    untrustBody:
+      "You are connected through this network. New SSH connections from it will be blocked (open connections stay).",
+    untrustOk: "Stop trusting",
+  },
+
+  // Backend errors, by UserError code (py_modules/sshwarden).
+  errors: {
+    command_failed: (p) => `${p.command} failed: ${p.detail}`,
+    password_length: (p) => `The password must be ${p.min} to ${p.max} characters long`,
+    password_control_chars: () => "The password must not contain control characters such as line breaks",
+    port_range: () => "The port must be between 1 and 65535",
+    port_in_use: (p) => `Port ${p.port} is already used by ${p.owner}`,
+    sshd_not_listening: (p) => `sshd did not start listening on port ${p.ports}; the previous settings were restored`,
+    no_authorized_keys: () => "No SSH public key is set up; without password login nobody could log in over SSH",
+    autooff_range: (p) => `Auto-off must be 1 to ${p.max} minutes away`,
+    firewall_not_running: () => "The firewall (firewalld) is not running, so SSH can't be limited by network",
+  } as ErrorMessages,
+};
+
+const zhCN: typeof en = {
+  loading: "正在读取 SSH 状态…",
+  loadFailed: (error) => `读取状态失败：${error}`,
+  cancel: "取消",
+  listSeparator: "、",
+
+  service: {
+    title: "SSH 服务",
+    enable: "启用 SSH",
+    running: "运行中，关闭后已建立的连接不会断开",
+    stopped: "已停止",
+    autooff: "自动关闭",
+    autooffHint: "到时不再接受新连接，已建立的连接不受影响",
+    autooffAt: (clock) => `将在 ${clock} 关闭 SSH，已建立的连接不受影响`,
+    never: "不自动关闭",
+    afterMinutes: (minutes) => `${minutes} 分钟后`,
+    afterHours: (hours) => `${hours} 小时后`,
+    remaining: (minutes) => `剩余 ${minutes} 分钟`,
+    autostart: "开机自启",
+  },
+
+  status: {
+    title: "状态",
+    configError: "配置错误",
+    network: "当前网络",
+    notConnected: "未连接",
+    noIPv4: "没有 IPv4 地址",
+    reachable: "可访问",
+    blocked: "已阻止",
+    sessions: "当前连接",
+    sessionCount: (n) => `${n} 个`,
+    failedLogins: "24 小时内登录失败",
+    failedCount: (n) => `${n} 次`,
+    lastLogin: "最近登录",
+    loginFrom: (user, from) => `${user} 来自 ${from}`,
+    none: "无",
+  },
+
+  connection: {
+    title: "连接设置",
+    port: "端口",
+    changePort: "修改端口",
+    modalTitle: "修改 SSH 端口",
+    modalDescription: "保存后 SSH 会立即切换到新端口，已建立的连接不受影响。新配置无法启动时会自动恢复原端口。",
+    portLabel: "端口（1-65535，默认 22）",
+    save: "保存",
+  },
+
+  login: {
+    title: "登录安全",
+    passwordAuth: "允许密码登录",
+    noKeys: "未配置 SSH 公钥，需先添加公钥才能关闭密码登录",
+    keysWithPassword: (n) => `已配置 ${n} 个公钥，关闭后只能用公钥登录`,
+    keysOnly: (n) => `只允许公钥登录（已配置 ${n} 个公钥）`,
+    changePassword: (user) => `修改 ${user} 密码`,
+    passwordChanged: (user) => `${user} 的密码已修改`,
+    modalTitle: (user) => `修改 ${user} 用户的密码`,
+    modalDescription: "这也是 sudo 和桌面模式使用的密码。已建立的 SSH 连接不受影响。",
+    newPassword: "新密码",
+    confirmPassword: "再次输入新密码",
+    tooShort: (min) => `密码至少需要 ${min} 个字符`,
+    mismatch: "两次输入的密码不一致",
+    submit: "修改密码",
+  },
+
+  trusted: {
+    title: "可信网络",
+    mode: "仅在可信网络开放 SSH",
+    busy: "正在配置防火墙，需要几秒钟…",
+    noFirewall: "防火墙（firewalld）没有运行，无法使用此功能",
+    onHint: "只有下面勾选的网络可以连接 SSH，其他网络（如公共 Wi-Fi）会被防火墙拦截",
+    offHint: "开启后，只有下面勾选的网络可以连接 SSH",
+    wifi: "Wi-Fi",
+    ethernet: "有线网络",
+    connected: "当前连接",
+    enableTitle: "当前网络不在可信列表中",
+    enableBody: (names) => `开启后将无法从「${names}」建立新的 SSH 连接（已建立的连接不受影响）。确定开启吗？`,
+    enableOk: "仍然开启",
+    untrustTitle: (name) => `取消信任「${name}」`,
+    untrustBody: "这是当前连接的网络，取消信任后将无法从它建立新的 SSH 连接（已建立的连接不受影响）。确定吗？",
+    untrustOk: "取消信任",
+  },
+
+  errors: {
+    command_failed: (p) => `${p.command} 失败：${p.detail}`,
+    password_length: (p) => `密码长度需在 ${p.min} 到 ${p.max} 个字符之间`,
+    password_control_chars: () => "密码不能包含换行等控制字符",
+    port_range: () => "端口需在 1 到 65535 之间",
+    port_in_use: (p) => `端口 ${p.port} 已被 ${p.owner} 占用`,
+    sshd_not_listening: (p) => `sshd 没有在端口 ${p.ports} 上启动，已恢复原配置`,
+    no_authorized_keys: () => "还没有配置 SSH 公钥，关闭密码登录后将无法再通过 SSH 登录",
+    autooff_range: (p) => `自动关闭时间需在 1 到 ${p.max} 分钟之间`,
+    firewall_not_running: () => "防火墙（firewalld）没有运行，无法按网络限制 SSH",
+  },
+};
+
+/** Steam's UI language as a lower-case locale, e.g. "zh-cn" or "en-us". */
+function steamLocale(): string {
+  const steam = window as { LocalizationManager?: { m_rgLocalesToUse?: string[] } };
+  return (steam.LocalizationManager?.m_rgLocalesToUse?.[0] ?? navigator.language ?? "").toLowerCase();
+}
+
+const locale = steamLocale();
+
+export const t = locale.startsWith("zh-cn") || locale.startsWith("zh-hans") ? zhCN : en;
+
+/** A backend error in the panel's language; unknown codes fall back to the backend's English text. */
+export function errorMessage(code: string | undefined, params: Params | undefined, fallback: string) {
+  const message = code ? t.errors[code] : undefined;
+  return message ? message(params ?? {}) : fallback;
+}

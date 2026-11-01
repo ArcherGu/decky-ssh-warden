@@ -1,4 +1,5 @@
 import { ConfirmModal } from "@decky/ui";
+import { t } from "../i18n";
 
 interface Props {
   title: string;
@@ -15,7 +16,7 @@ export function ConfirmDialog({ title, description, okText, onConfirm, closeModa
       strTitle={title}
       strDescription={description}
       strOKButtonText={okText}
-      strCancelButtonText="取消"
+      strCancelButtonText={t.cancel}
       onOK={() => {
         closeModal?.();
         onConfirm();

@@ -1,6 +1,7 @@
 import { PanelSection, PanelSectionRow, staticClasses } from "@decky/ui";
 import { definePlugin } from "@decky/api";
 import { FaUserShield } from "react-icons/fa";
+import { t } from "./i18n";
 import { useStatus } from "./useStatus";
 import { ConnectionSection } from "./sections/ConnectionSection";
 import { LoginSection } from "./sections/LoginSection";
@@ -14,7 +15,7 @@ function Content() {
   if (!status) {
     return (
       <PanelSection>
-        <PanelSectionRow>{error ? `读取状态失败：${error}` : "正在读取 SSH 状态…"}</PanelSectionRow>
+        <PanelSectionRow>{error ? t.loadFailed(error) : t.loading}</PanelSectionRow>
       </PanelSection>
     );
   }

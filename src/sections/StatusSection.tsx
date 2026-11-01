@@ -1,6 +1,7 @@
 import { Field, PanelSection, PanelSectionRow } from "@decky/ui";
 import { Status } from "../api";
 import { formatTime } from "../format";
+import { t } from "../i18n";
 
 const OK = "#5ba32b";
 const WARN = "#e0a33b";
@@ -14,17 +15,17 @@ function sshCommand(status: Status, address: string) {
 export function StatusSection({ status }: { status: Status }) {
   const lastLogin = status.logins.recent[0];
   return (
-    <PanelSection title="状态">
+    <PanelSection title={t.status.title}>
       {status.config_error && (
         <PanelSectionRow>
-          <Field label="配置错误" description={status.config_error} bottomSeparator="none" />
+          <Field label={t.status.configError} description={status.config_error} bottomSeparator="none" />
         </PanelSectionRow>
       )}
 
       {status.networks.length === 0 && (
         <PanelSectionRow>
-          <Field label="当前网络" bottomSeparator="none">
-            <span style={{ color: MUTED }}>未连接</span>
+          <Field label={t.status.network} bottomSeparator="none">
+            <span style={{ color: MUTED }}>{t.status.notConnected}</span>
           </Field>
         </PanelSectionRow>
       )}
@@ -32,35 +33,35 @@ export function StatusSection({ status }: { status: Status }) {
         <PanelSectionRow key={n.uuid}>
           <Field
             label={n.name}
-            description={n.addresses.map((a) => sshCommand(status, a)).join("\n") || "没有 IPv4 地址"}
+            description={n.addresses.map((a) => sshCommand(status, a)).join("\n") || t.status.noIPv4}
             bottomSeparator="none"
           >
-            <span style={{ color: n.ssh_allowed ? OK : WARN }}>{n.ssh_allowed ? "可访问" : "已阻止"}</span>
+            <span style={{ color: n.ssh_allowed ? OK : WARN }}>{n.ssh_allowed ? t.status.reachable : t.status.blocked}</span>
           </Field>
         </PanelSectionRow>
       ))}
 
       <PanelSectionRow>
         <Field
-          label="当前连接"
-          description={status.sessions.length ? Array.from(new Set(status.sessions)).join("、") : undefined}
+          label={t.status.sessions}
+          description={status.sessions.length ? Array.from(new Set(status.sessions)).join(t.listSeparator) : undefined}
           bottomSeparator="none"
         >
-          {status.sessions.length} 个
+          {t.status.sessionCount(status.sessions.length)}
         </Field>
       </PanelSectionRow>
       <PanelSectionRow>
-        <Field label="24 小时内登录失败" bottomSeparator="none">
-          <span style={{ color: status.logins.failed ? WARN : undefined }}>{status.logins.failed} 次</span>
+        <Field label={t.status.failedLogins} bottomSeparator="none">
+          <span style={{ color: status.logins.failed ? WARN : undefined }}>{t.status.failedCount(status.logins.failed)}</span>
         </Field>
       </PanelSectionRow>
       <PanelSectionRow>
         <Field
-          label="最近登录"
-          description={lastLogin ? `${lastLogin.user} 来自 ${lastLogin.from}` : undefined}
+          label={t.status.lastLogin}
+          description={lastLogin ? t.status.loginFrom(lastLogin.user, lastLogin.from) : undefined}
           bottomSeparator="none"
         >
-          {lastLogin ? formatTime(lastLogin.time) : "无"}
+          {lastLogin ? formatTime(lastLogin.time) : t.status.none}
         </Field>
       </PanelSectionRow>
     </PanelSection>
