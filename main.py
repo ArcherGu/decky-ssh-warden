@@ -1,4 +1,5 @@
 import asyncio
+import threading
 
 import decky
 
@@ -6,10 +7,29 @@ from sshwarden import account, cleanup, keys, port, settings, sshd, status, trus
 from sshwarden.errors import UserError
 
 
-async def _call(fn, *args) -> dict:
-    """Run a blocking backend function off the event loop; report errors to the UI as data."""
+# Changes run one at a time. Each panel section only disables its own controls, and Decky runs
+# calls concurrently, so without this two changes could overwrite each other's settings.json
+# (losing firewall records) or both pass checks meant to be exclusive (last key vs. password
+# login).
+_changes = threading.Lock()
+
+
+def _exclusive(fn, *args):
+    with _changes:
+        return fn(*args)
+
+
+async def _call(fn, *args, exclusive: bool = True) -> dict:
+    """Run a blocking backend function off the event loop; report errors to the UI as data.
+
+    Only reads may pass exclusive=False.
+    """
     try:
-        return {"ok": True, "data": await asyncio.to_thread(fn, *args)}
+        if exclusive:
+            data = await asyncio.to_thread(_exclusive, fn, *args)
+        else:
+            data = await asyncio.to_thread(fn, *args)
+        return {"ok": True, "data": data}
     except Exception as e:
         decky.logger.exception("%s failed", getattr(fn, "__name__", fn))
         result = {"ok": False, "error": str(e)}
@@ -21,7 +41,7 @@ async def _call(fn, *args) -> dict:
 
 class Plugin:
     async def get_status(self) -> dict:
-        return await _call(status.collect)
+        return await _call(status.collect, exclusive=False)
 
     async def set_running(self, on: bool) -> dict:
         return await _call(sshd.set_running, bool(on))
