@@ -66,6 +66,8 @@ pnpm typecheck
   sudo python3 -B -m sshwarden port 2222
   ```
 
+参与本仓库开发的 AI agent 请先阅读 [AGENTS.md](AGENTS.md)。
+
 ### 远程测试的安全网：`dev/deck-guard`
 
 远程测试 SSH 相关功能时，一次失误就可能让 Deck 再也连不上。`dev/deck-guard` 是一个开发期用的「看门狗」：

@@ -66,6 +66,8 @@ pnpm typecheck
   sudo python3 -B -m sshwarden port 2222
   ```
 
+AI agents working on this repository should read [AGENTS.md](AGENTS.md) first.
+
 ### Safety net for remote testing: `dev/deck-guard`
 
 When you test SSH-related features remotely, one mistake can leave the Deck unreachable. `dev/deck-guard` is a development-time watchdog:
