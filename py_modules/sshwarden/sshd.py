@@ -1,8 +1,11 @@
+import json
 import re
 
 from .proc import run
 
 UNIT = "sshd.service"
+AUTOOFF_UNIT = "ssh-warden-autooff"
+MAX_AUTOOFF_MINUTES = 24 * 60
 
 
 def effective_config() -> dict[str, list[str]]:
@@ -28,6 +31,41 @@ def service_state() -> dict:
 def set_running(on: bool) -> None:
     # Stopping only closes the listener; established sessions stay connected.
     run(["systemctl", "start" if on else "stop", UNIT])
+    if not on:
+        cancel_autooff()
+
+
+def schedule_autooff(minutes: int) -> None:
+    """Stop sshd `minutes` from now with a transient systemd timer (survives Decky restarts)."""
+    if not 1 <= minutes <= MAX_AUTOOFF_MINUTES:
+        raise ValueError(f"自动关闭时间需在 1 到 {MAX_AUTOOFF_MINUTES} 分钟之间")
+    cancel_autooff()
+    run([
+        "systemd-run",
+        f"--unit={AUTOOFF_UNIT}",
+        f"--on-active={minutes}min",
+        "--timer-property=AccuracySec=1s",
+        "--description=SSH Warden: stop sshd after a timeout",
+        "/usr/bin/systemctl", "stop", UNIT,
+    ])
+
+
+def cancel_autooff() -> None:
+    run(["systemctl", "stop", f"{AUTOOFF_UNIT}.timer"], check=False)
+    run(["systemctl", "reset-failed", f"{AUTOOFF_UNIT}.timer", f"{AUTOOFF_UNIT}.service"], check=False)
+
+
+def autooff_deadline() -> float | None:
+    """Unix time at which sshd will be stopped automatically, or None."""
+    out = run(["systemctl", "list-timers", "--all", "-o", "json", f"{AUTOOFF_UNIT}.timer"], check=False)
+    try:
+        timers = json.loads(out or "[]")
+    except json.JSONDecodeError:
+        return None
+    for t in timers:
+        if t.get("unit") == f"{AUTOOFF_UNIT}.timer" and t.get("next"):
+            return t["next"] / 1_000_000
+    return None
 
 
 def set_autostart(on: bool) -> None:

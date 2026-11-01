@@ -24,6 +24,12 @@ class Plugin:
     async def set_autostart(self, on: bool) -> dict:
         return await _call(sshd.set_autostart, bool(on))
 
+    async def set_autooff(self, minutes: int) -> dict:
+        """Stop sshd after `minutes`; 0 cancels a pending auto-off."""
+        if int(minutes) <= 0:
+            return await _call(sshd.cancel_autooff)
+        return await _call(sshd.schedule_autooff, int(minutes))
+
     async def _main(self):
         decky.logger.info("SSH Warden loaded")
 

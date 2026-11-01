@@ -18,6 +18,7 @@ def collect() -> dict:
     return {
         "user": DECK_USER,
         **sshd.service_state(),
+        "autooff_at": sshd.autooff_deadline(),
         "ports": listen_ports,
         "config_error": config_error,
         "password_auth": config.get("passwordauthentication", ["yes"])[0] == "yes",

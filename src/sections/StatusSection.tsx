@@ -1,15 +1,10 @@
 import { Field, PanelSection, PanelSectionRow } from "@decky/ui";
 import { Status } from "../api";
+import { formatTime } from "../format";
 
 const OK = "#5ba32b";
 const WARN = "#e0a33b";
 const MUTED = "#8b929a";
-
-function formatTime(seconds: number) {
-  const d = new Date(seconds * 1000);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 function sshCommand(status: Status, address: string) {
   const port = status.ports[0] ?? 22;

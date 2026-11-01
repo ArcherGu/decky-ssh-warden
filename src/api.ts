@@ -21,6 +21,7 @@ export interface Status {
   user: string;
   running: boolean;
   autostart: boolean;
+  autooff_at: number | null;
   ports: number[];
   config_error: string | null;
   password_auth: boolean;
@@ -46,7 +47,10 @@ export function notifyError(e: unknown) {
 const getStatusCall = callable<[], Result<Status>>("get_status");
 const setRunningCall = callable<[on: boolean], Result<null>>("set_running");
 const setAutostartCall = callable<[on: boolean], Result<null>>("set_autostart");
+const setAutooffCall = callable<[minutes: number], Result<null>>("set_autooff");
 
 export const getStatus = () => unwrap(getStatusCall());
 export const setRunning = (on: boolean) => unwrap(setRunningCall(on));
 export const setAutostart = (on: boolean) => unwrap(setAutostartCall(on));
+/** Stop SSH after `minutes`; 0 cancels. */
+export const setAutooff = (minutes: number) => unwrap(setAutooffCall(minutes));
