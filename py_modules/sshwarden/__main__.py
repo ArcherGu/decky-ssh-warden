@@ -5,7 +5,7 @@
 import json
 import sys
 
-from . import account, port, sshd, status, trust
+from . import account, cleanup, port, sshd, status, trust
 
 
 def on_off(value: str) -> bool:
@@ -26,6 +26,7 @@ def main(argv: list[str]) -> int:
         "passwd": lambda: account.change_password(sys.stdin.readline().rstrip("\n")),
         "trusted-mode": lambda v: trust.set_enabled(on_off(v)),
         "trust": lambda uuid, v: trust.set_network_trusted(uuid, on_off(v)),
+        "cleanup": lambda: cleanup.revert_all(),
     }
     if not argv or argv[0] not in commands:
         print(f"usage: python3 -m sshwarden {{{'|'.join(commands)}}} [args...]", file=sys.stderr)

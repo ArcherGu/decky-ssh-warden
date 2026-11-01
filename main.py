@@ -2,7 +2,7 @@ import asyncio
 
 import decky
 
-from sshwarden import account, port, settings, sshd, status, trust
+from sshwarden import account, cleanup, port, settings, sshd, status, trust
 
 
 async def _call(fn, *args) -> dict:
@@ -53,4 +53,6 @@ class Plugin:
         decky.logger.info("SSH Warden unloaded")
 
     async def _uninstall(self):
-        decky.logger.info("SSH Warden uninstalled")
+        # Leave no orphaned firewall zone/rules or sshd drop-in behind.
+        result = await _call(cleanup.revert_all)
+        decky.logger.info("SSH Warden uninstalled, cleanup: %s", result)
