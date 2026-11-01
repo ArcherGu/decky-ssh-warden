@@ -49,6 +49,8 @@ const setRunningCall = callable<[on: boolean], Result<null>>("set_running");
 const setAutostartCall = callable<[on: boolean], Result<null>>("set_autostart");
 const setAutooffCall = callable<[minutes: number], Result<null>>("set_autooff");
 const setPortCall = callable<[port: number], Result<null>>("set_port");
+const setPasswordAuthCall = callable<[on: boolean], Result<null>>("set_password_auth");
+const changePasswordCall = callable<[newPassword: string], Result<null>>("change_password");
 
 export const getStatus = () => unwrap(getStatusCall());
 export const setRunning = (on: boolean) => unwrap(setRunningCall(on));
@@ -56,3 +58,5 @@ export const setAutostart = (on: boolean) => unwrap(setAutostartCall(on));
 /** Stop SSH after `minutes`; 0 cancels. */
 export const setAutooff = (minutes: number) => unwrap(setAutooffCall(minutes));
 export const setPort = (port: number) => unwrap(setPortCall(port));
+export const setPasswordAuth = (on: boolean) => unwrap(setPasswordAuthCall(on));
+export const changePassword = (newPassword: string) => unwrap(changePasswordCall(newPassword));

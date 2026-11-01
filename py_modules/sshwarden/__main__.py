@@ -5,7 +5,7 @@
 import json
 import sys
 
-from . import port, sshd, status
+from . import account, port, sshd, status
 
 
 def on_off(value: str) -> bool:
@@ -21,6 +21,9 @@ def main(argv: list[str]) -> int:
         "autostart": lambda v: sshd.set_autostart(on_off(v)),
         "autooff": lambda minutes: sshd.schedule_autooff(int(minutes)) if minutes != "cancel" else sshd.cancel_autooff(),
         "port": lambda number: port.set_port(int(number)),
+        "password-auth": lambda v: sshd.set_password_auth(on_off(v)),
+        # Reads the new password from stdin so it stays out of argv.
+        "passwd": lambda: account.change_password(sys.stdin.readline().rstrip("\n")),
     }
     if not argv or argv[0] not in commands:
         print(f"usage: python3 -m sshwarden {{{'|'.join(commands)}}} [args...]", file=sys.stderr)

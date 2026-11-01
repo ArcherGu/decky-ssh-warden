@@ -3,6 +3,7 @@ import os
 import re
 import time
 
+from .account import has_authorized_keys
 from .proc import CommandError, run
 
 UNIT = "sshd.service"
@@ -101,6 +102,13 @@ def update_config(changes: dict[str, str | None]) -> None:
         if was_running:
             run(["systemctl", "restart", UNIT], check=False)
         raise
+
+
+def set_password_auth(on: bool) -> None:
+    if not on and not has_authorized_keys():
+        raise ValueError("还没有配置 SSH 公钥，关闭密码登录后将无法再通过 SSH 登录")
+    # "yes" is sshd's default, so turning it back on just drops our override.
+    update_config({"PasswordAuthentication": None if on else "no"})
 
 
 def port_owner(port: int) -> str | None:

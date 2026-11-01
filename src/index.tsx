@@ -3,6 +3,7 @@ import { definePlugin } from "@decky/api";
 import { FaUserShield } from "react-icons/fa";
 import { useStatus } from "./useStatus";
 import { ConnectionSection } from "./sections/ConnectionSection";
+import { LoginSection } from "./sections/LoginSection";
 import { ServiceSection } from "./sections/ServiceSection";
 import { StatusSection } from "./sections/StatusSection";
 
@@ -22,6 +23,7 @@ function Content() {
       <ServiceSection status={status} refresh={refresh} />
       <StatusSection status={status} />
       <ConnectionSection status={status} refresh={refresh} />
+      <LoginSection status={status} refresh={refresh} />
     </>
   );
 }
