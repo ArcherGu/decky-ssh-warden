@@ -16,6 +16,8 @@ A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for m
 
 The panel follows Steam's language: Simplified Chinese when Steam is set to it, English otherwise.
 
+Turning SSH off, by hand or with the auto-off timer, only stops new connections: sessions that are already open stay connected, even when idle. Changing the port or password login restarts sshd on its own, and open sessions survive that too. A new password takes effect for the next login without a restart.
+
 ## Safety by design
 
 - **Changing settings cannot lock you out.** The plugin only writes its own sshd drop-in, `/etc/ssh/sshd_config.d/05-ssh-warden.conf`, and never touches the main config. Every change is validated with `sshd -t`, and sshd must come back listening on the expected port; if any step fails, the previous configuration is restored automatically.

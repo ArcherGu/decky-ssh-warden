@@ -9,7 +9,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - The plugin runs as **root** (`flags: ["root"]` in `plugin.json`). A backend bug can break the system directly or lock the user out of SSH.
 - Target: SteamOS 3.9, Decky Loader 3.3.x. The backend runs inside Decky's bundled Python 3.14 (a PyInstaller build).
 - Development machine: macOS with Node 24 and pnpm 12. A stock macOS `python3` (3.9) **cannot import the backend modules** (they use 3.10+ syntax such as `str | None`), so the backend can only be run and tested on the Deck.
-- UI text and user-facing backend error messages are in **Simplified Chinese**. Code comments and commit messages are in English.
+- The panel is in **English and Simplified Chinese**, following Steam's language (`src/i18n.ts`). Code comments, commit messages, logs and the backend's own messages are in English.
 
 ## Repository layout
 
@@ -17,6 +17,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 | --- | --- |
 | `main.py` | Decky backend entry point. It only forwards: every method is `return await _call(fn, *args)` |
 | `py_modules/sshwarden/proc.py` | The only place that runs system commands: `run()`, `succeeds()`, `split_terse()` |
+| `py_modules/sshwarden/errors.py` | `UserError`: an error for the user, with a code the panel translates |
 | `py_modules/sshwarden/sshd.py` | sshd service state, on/off, auto-off timer, config read/write (drop-in + validation + rollback), login history |
 | `py_modules/sshwarden/net.py` | NetworkManager connections, firewalld zones and rules, `sync_ssh_firewall()`, `zones_snapshot()` |
 | `py_modules/sshwarden/port.py` | The full port-change flow (firewall → sshd → cleanup) |
@@ -27,6 +28,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 | `py_modules/sshwarden/settings.py` | `~/homebrew/settings/decky-ssh-warden/settings.json` |
 | `py_modules/sshwarden/__main__.py` | Command-line entry for testing the backend on the Deck without the UI |
 | `src/api.ts` | `callable` wrappers for backend methods and the `Status` type |
+| `src/i18n.ts` | Every UI string in both languages, backend error translations, language detection |
 | `src/sections/*.tsx` | One file per panel section |
 | `src/components/*.tsx` | Dialogs |
 | `src/useStatus.ts` / `src/useAction.ts` | Poll the status every 3 seconds / run an action, toast errors, then refresh |
@@ -37,7 +39,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 ## Backend conventions
 
 - **Run system commands only through `proc.run()`**, never `subprocess` directly. Decky is a PyInstaller app that points `LD_LIBRARY_PATH` at its bundled libraries, which makes system programs such as `sshd`, `bash` and `nmcli` fail to start; `run()` cleans that up. It also pins `LC_ALL=C` and `PATH` so output stays parseable.
-- Backend functions are synchronous. `_call()` in `main.py` runs them with `asyncio.to_thread` and returns `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`. For errors the user should see, `raise ValueError("<message in Chinese>")`.
+- Backend functions are synchronous. `_call()` in `main.py` runs them with `asyncio.to_thread` and returns `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`. For errors the user should see, `raise UserError("<code>", "<English message with {params}>", **params)`; `_call()` adds `code` and `params` to the result and the panel shows the translation of that code from `errors` in `src/i18n.ts`, falling back to the English message. `CommandError`, raised by `proc.run()`, is a `UserError` with the code `command_failed`.
 - **The system is the source of truth**, not `settings.json`. Settings only store two kinds of data: changes the plugin made (so they can be undone) and user preferences (the trusted-network list).
 - Known parsing pitfalls:
   - `sshd -T` prints keys in mixed case (e.g. `PasswordAuthentication yes`); `effective_config()` lower-cases them.
@@ -70,6 +72,8 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - Wrap new backend methods in `src/api.ts` with `callable` plus `unwrap`, and keep the `Status` type in sync with what `status.collect()` returns.
 - **In the current Steam client, `ConfirmModal` does not close itself after OK or Cancel**: always call `closeModal()` in `onOK` and `onCancel`. Use `components/ConfirmDialog.tsx` for simple yes/no dialogs.
 - The Quick Access Menu is only about 300 px wide: use `layout="below"` for dropdowns and other controls that may show long text, or it gets truncated.
+- **Never hard-code UI text.** Add each string to both `en` and `zhCN` in `src/i18n.ts` and use it through `t` (`zhCN` is typed as `typeof en`, so a missing translation fails the typecheck). Strings that contain values are functions, so each language can order the words its own way.
+- The language is read once, when the plugin loads: `LocalizationManager.m_rgLocalesToUse[0]` is Steam's UI language (e.g. `zh-cn`, `en-us`), with `navigator.language` as a fallback. Simplified Chinese (`zh-cn`, `zh-hans`) gets Chinese; every other language gets English. Steam restarts when its language changes, which reloads the plugin.
 - Import `toaster` from `@decky/api`, not `@decky/ui`.
 - Closing the Quick Access Menu unmounts the plugin UI and stops polling. Do not add background timers.
 
@@ -144,12 +148,26 @@ python3 cdp.py targets
 python3 cdp.py eval SharedJSContext 'DFL.Navigation.OpenQuickAccessMenu(DFL.QuickAccessTab.Decky)'
 python3 cdp.py eval SharedJSContext 'DeckyPluginLoader.deckyState.setActivePlugin("SSH Warden")'
 python3 cdp.py shot QuickAccess /tmp/qam.png
-python3 cdp.py toggle QuickAccess '启用 SSH'
+python3 cdp.py toggle QuickAccess '启用 SSH'   # labels are in the Deck's current language
 python3 cdp.py eval SharedJSContext 'DFL.Navigation.CloseSideMenus()'
 ```
 
-- Dropdown menus and dialogs render in the `Steam 大屏幕模式` (Big Picture) target, not in `QuickAccess`. After interacting with a dialog, the Quick Access Menu usually closes; reopen it before taking a screenshot (hidden windows do not render and screenshots time out).
-- To change a controlled input, set the value through the `value` setter on `HTMLInputElement.prototype` and dispatch an `input` event so React notices.
+- Dropdown menus and dialogs render in the Big Picture target, not in `QuickAccess`; its title follows Steam's language (`Steam Big Picture Mode`, `Steam 大屏幕模式`, ...). After interacting with a dialog, the Quick Access Menu usually closes; reopen it before taking a screenshot (hidden windows do not render and screenshots time out).
+- To change a controlled input, set the value through the `value` setter on `HTMLInputElement.prototype` and dispatch an `input` event so React notices. Password fields are plain `input` elements too, not `type=password`, and the Big Picture page also contains many `type=file` inputs, so select `input:not([type=file])` inside the dialog.
+- To check the other language without changing Steam's (which restarts Steam), reload only this plugin's frontend with a different locale list and put Steam's back right away. Run it again with Steam's own locale to switch back:
+
+  ```js
+  (async () => {
+    const lm = LocalizationManager, saved = lm.m_rgLocalesToUse;
+    const p = DeckyPluginLoader.plugins.find((p) => p.name === "SSH Warden");
+    try {
+      lm.m_rgLocalesToUse = ["en-us"];
+      await DeckyPluginLoader.importPlugin(p.name, p.version, p.loadType, false);
+    } finally {
+      lm.m_rgLocalesToUse = saved;
+    }
+  })()
+  ```
 - Close the Quick Access Menu when you are done, so the user's screen is not left on the plugin page.
 
 ## Commit conventions
@@ -160,13 +178,13 @@ python3 cdp.py eval SharedJSContext 'DFL.Navigation.CloseSideMenus()'
 
 ## Checklist for a new feature
 
-1. Implement the backend in `py_modules/sshwarden/`, running system commands through `proc.run()` and raising `ValueError` with a Chinese message for user-facing errors.
+1. Implement the backend in `py_modules/sshwarden/`, running system commands through `proc.run()` and raising `UserError` for user-facing errors (add the code's translation to both languages in `src/i18n.ts`).
 2. Add a CLI subcommand in `__main__.py` and a `_call()` forwarding method in `main.py`.
 3. If the status needs a new field, update both `status.collect()` and the `Status` type in `src/api.ts`, without making the status call slower.
-4. Add the wrapper in `src/api.ts`, then the section or dialog component.
+4. Add the wrapper in `src/api.ts`, then the section or dialog component, with its text in both languages in `src/i18n.ts`.
 5. Add the matching undo logic to `cleanup.revert_all()`.
 6. If the feature changes system state the watchdog does not cover, extend `dev/deck-guard/guard.sh` first.
-7. Run `pnpm typecheck`, test the backend CLI on a Deck with the watchdog installed, test the UI with `dev/cdp.py`, and confirm the watchdog reports `changed components: ''`.
+7. Run `pnpm typecheck`, test the backend CLI on a Deck with the watchdog installed, test the UI in both languages with `dev/cdp.py`, and confirm the watchdog reports `changed components: ''`.
 8. Commit the feature on its own.
 
 ## Known TODOs
