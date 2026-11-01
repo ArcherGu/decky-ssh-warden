@@ -1,5 +1,6 @@
 import json
 
+from . import settings
 from .proc import run, split_terse, succeeds
 
 LAN_TYPES = {"802-11-wireless": "wifi", "802-3-ethernet": "ethernet"}
@@ -215,6 +216,12 @@ def sync_ssh_firewall(ports: set[int], data: dict) -> None:
     Normal mode: open the ports in every LAN zone that would block them.
     Trusted mode: open them in TRUSTED_ZONE and drop them in every other LAN zone.
     Every rule we add is recorded in data["firewall"] so it can be removed later.
+
+    Decky can SIGKILL the plugin halfway (see cleanup.py), so a rule is recorded and saved
+    before it is added, and forgotten only after it is removed: an interruption leaves at most
+    a record whose rule is missing, never a rule nobody knows about. Recorded rules that are
+    still wanted are added again (firewalld accepts adding an existing rule), so a missing one
+    comes back. Callers save `data` afterwards as before.
     """
     if not firewall_running():
         return
@@ -234,8 +241,9 @@ def sync_ssh_firewall(ports: set[int], data: dict) -> None:
     # Add before removing, so SSH is never closed where it is meant to stay open.
     for entry in wanted:
         if entry not in recorded:
-            _apply(entry, add=True)
             recorded.append(entry)
+            settings.save(data)
+        _apply(entry, add=True)
     for entry in list(recorded):
         if entry not in wanted:
             _apply(entry, add=False)
