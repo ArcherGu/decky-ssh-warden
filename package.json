@@ -7,6 +7,7 @@
     "build": "rollup -c",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
+    "check:i18n": "python3 scripts/check_i18n.py",
     "package": "pnpm build && bash scripts/package.sh"
   },
   "repository": {

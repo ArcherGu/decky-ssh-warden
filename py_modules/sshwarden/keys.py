@@ -77,13 +77,9 @@ def _read_lines() -> list[str]:
 
 
 def list_keys() -> list[dict]:
-    """Keys in authorized_keys; none when the file is unsafe to read (the status must not fail)."""
-    try:
-        lines = _read_lines()
-    except UserError:
-        return []
+    """Keys in authorized_keys. Raises UserError ("keys_file_unsafe") when it cannot be read safely."""
     keys, seen = [], set()
-    for line in lines:
+    for line in _read_lines():
         key = parse_key(line)
         if key and key["fingerprint"] not in seen:
             seen.add(key["fingerprint"])
@@ -92,7 +88,10 @@ def list_keys() -> list[dict]:
 
 
 def has_authorized_keys() -> bool:
-    return bool(list_keys())
+    try:
+        return bool(list_keys())
+    except UserError:
+        return False
 
 
 def _write_lines(lines: list[str]) -> None:

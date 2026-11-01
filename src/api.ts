@@ -44,6 +44,8 @@ export interface Status {
   /** Whether the deck user has a password; changing it then needs the current one. */
   password_set: boolean;
   keys: PublicKey[];
+  /** ~/.ssh or authorized_keys is a symlink or not a plain file, so the plugin leaves it alone. */
+  keys_unsafe: boolean;
   /** Whether sshd lets these keys log in on their own, so password login may be turned off. */
   key_login: boolean;
   sessions: string[];

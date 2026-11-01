@@ -80,6 +80,8 @@ const en = {
   keys: {
     title: "Public Keys",
     none: "No public keys yet",
+    unsafe:
+      "~/.ssh or ~/.ssh/authorized_keys is a symlink or not a plain file, so the plugin leaves it alone. Fix it in Desktop Mode.",
     unnamed: "Unnamed key",
     remove: "Remove",
     lastKeyLocked: "Password login is off, so the last key can't be removed",
@@ -134,6 +136,8 @@ const en = {
     key_file_private: (p) => `${p.file} is a private key; pick the matching .pub file`,
     key_file_invalid: (p) => `${p.file} contains no SSH public key`,
     key_not_found: () => "This public key no longer exists",
+    keys_file_unsafe: () =>
+      "~/.ssh or ~/.ssh/authorized_keys is a symlink or not a plain file, so the plugin leaves it alone",
     last_key: () => "This is the last public key and password login is off; removing it would lock everyone out",
   } satisfies ErrorMessages,
 };
@@ -210,6 +214,7 @@ const zhCN: typeof en = {
   keys: {
     title: "公钥",
     none: "还没有公钥",
+    unsafe: "~/.ssh 或 ~/.ssh/authorized_keys 是符号链接或不是普通文件，插件不会读写它。请在桌面模式下处理。",
     unnamed: "未命名公钥",
     remove: "删除",
     lastKeyLocked: "密码登录已关闭，不能删除最后一个公钥",
@@ -257,6 +262,7 @@ const zhCN: typeof en = {
     key_file_private: (p) => `${p.file} 是私钥，请选择对应的 .pub 文件`,
     key_file_invalid: (p) => `${p.file} 里没有 SSH 公钥`,
     key_not_found: () => "这个公钥已经不存在了",
+    keys_file_unsafe: () => "~/.ssh 或 ~/.ssh/authorized_keys 是符号链接或不是普通文件，插件不会读写它",
     last_key: () => "这是最后一个公钥，而且密码登录已关闭，删除后将无法再通过 SSH 登录",
   },
 };

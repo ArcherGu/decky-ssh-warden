@@ -50,7 +50,12 @@ export function KeysSection({ status, refresh }: { status: Status; refresh: () =
 
   return (
     <PanelSection title={t.keys.title}>
-      {status.keys.length === 0 && (
+      {status.keys_unsafe && (
+        <PanelSectionRow>
+          <Field label={t.keys.unsafe} bottomSeparator="none" />
+        </PanelSectionRow>
+      )}
+      {status.keys.length === 0 && !status.keys_unsafe && (
         <PanelSectionRow>
           <Field label={t.keys.none} bottomSeparator="none" />
         </PanelSectionRow>
@@ -69,7 +74,12 @@ export function KeysSection({ status, refresh }: { status: Status; refresh: () =
         </PanelSectionRow>
       ))}
       <PanelSectionRow>
-        <ButtonItem layout="below" description={importHint(status)} disabled={busy} onClick={importFromFile}>
+        <ButtonItem
+          layout="below"
+          description={importHint(status)}
+          disabled={busy || status.keys_unsafe}
+          onClick={importFromFile}
+        >
           {t.keys.importFile}
         </ButtonItem>
       </PanelSectionRow>

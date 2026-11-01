@@ -7,6 +7,7 @@ import { useAction } from "../useAction";
 
 function passwordAuthHint(status: Status) {
   const count = status.keys.length;
+  if (status.keys_unsafe) return t.keys.unsafe;
   if (count === 0) return t.login.noKeys;
   if (status.password_auth && !status.key_login) return t.login.keysNotAccepted;
   return status.password_auth ? t.login.keysWithPassword(count) : t.login.keysOnly(count);
