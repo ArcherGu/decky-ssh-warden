@@ -1,0 +1,11 @@
+{
+  "name": "SSH Warden",
+  "author": "ArcherGu",
+  "flags": ["root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["ssh", "security", "network", "root"],
+    "description": "在游戏模式下管理 Steam Deck 的 SSH 服务：开关、端口、密码登录、可信网络与定时关闭。",
+    "image": ""
+  }
+}

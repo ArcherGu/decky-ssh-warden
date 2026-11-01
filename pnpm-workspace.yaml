@@ -1,0 +1,5 @@
+# React is provided by the Steam client at runtime, so it is not installed here.
+peerDependencyRules:
+  ignoreMissing:
+    - react
+    - react-dom
