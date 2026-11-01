@@ -1,28 +1,44 @@
-"""Small JSON store for what the plugin itself changed (e.g. firewall rules it added)."""
+"""Small JSON store for what the plugin itself changed (e.g. firewall rules it added).
+
+It lives in Decky's settings directory, which belongs to the deck user, so it is read and
+written through safefile (no symlinks followed).
+"""
 import json
 import os
 
-DEFAULT_DIR = "/home/deck/homebrew/settings/decky-ssh-warden"
+from . import safefile
 
-_path = os.path.join(DEFAULT_DIR, "settings.json")
+DEFAULT_DIR = "/home/deck/homebrew/settings/decky-ssh-warden"
+NAME = "settings.json"
+MAX_BYTES = 1024 * 1024
+
+_dir = DEFAULT_DIR
 
 
 def init(directory: str) -> None:
-    global _path
-    _path = os.path.join(directory, "settings.json")
+    global _dir
+    _dir = directory
 
 
 def load() -> dict:
+    """The stored settings; empty when missing, corrupt or not a plain file."""
     try:
-        with open(_path, encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        dir_fd = safefile.open_dir(_dir)
+    except OSError:
         return {}
+    try:
+        data = safefile.read(dir_fd, NAME, MAX_BYTES)
+        return json.loads(data) if data else {}
+    except (OSError, ValueError):
+        return {}
+    finally:
+        os.close(dir_fd)
 
 
 def save(data: dict) -> None:
-    os.makedirs(os.path.dirname(_path), exist_ok=True)
-    tmp = f"{_path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, _path)
+    dir_fd = safefile.open_dir(_dir, create_mode=0o755)
+    try:
+        text = json.dumps(data, ensure_ascii=False, indent=2)
+        safefile.write(dir_fd, NAME, text.encode(), 0o644)
+    finally:
+        os.close(dir_fd)
