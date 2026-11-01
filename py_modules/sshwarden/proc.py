@@ -34,6 +34,7 @@ def run(args: list[str], *, input: str | None = None, check: bool = True, timeou
             input=input,
             capture_output=True,
             text=True,
+            errors="replace",  # output of a file the user picked may not be text
             env=_system_env(),
             timeout=timeout,
         )

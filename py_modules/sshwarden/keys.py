@@ -7,6 +7,7 @@ import pwd
 
 from . import DECK_USER, safefile
 from .errors import UserError
+from .proc import CommandError, run
 
 HOME = f"/home/{DECK_USER}"
 SSH_DIR = f"{HOME}/.ssh"
@@ -122,19 +123,26 @@ def _write_lines(lines: list[str]) -> None:
 def import_file(path: str) -> dict:
     """Add every new public key found in `path` (a .pub file or an authorized_keys file)."""
     name = os.path.basename(path)
+    # Read as the deck user, never as root: it is the user's own key file, and any local
+    # process can ask the plugin to import a path (see account.py). As root that would reveal
+    # whether a root-only file holds a private key, and opening some device files has side
+    # effects. The timeout covers a FIFO.
     try:
-        data = safefile.read_path(path, MAX_IMPORT_BYTES)
-    except OSError as e:
-        reason = e.strerror or str(e)
+        text = run(["runuser", "-u", DECK_USER, "--", "head", "-c", str(MAX_IMPORT_BYTES + 1), "--", path], timeout=5)
+    except CommandError as e:
+        detail = e.params["detail"]
+        reason = "timed out" if "timed out" in detail else detail.rsplit(": ", 1)[-1]
         raise UserError("key_file_unreadable", "Cannot read {file}: {reason}", file=name, reason=reason)
+    if len(text) > MAX_IMPORT_BYTES:
+        raise UserError("key_file_unreadable", "Cannot read {file}: {reason}", file=name, reason="file too large")
     # Never parse, store or echo a private key that was picked by mistake.
-    if b"PRIVATE KEY" in data or b"PuTTY-User-Key-File" in data:
+    if "PRIVATE KEY" in text or "PuTTY-User-Key-File" in text:
         raise UserError("key_file_private", "{file} is a private key; pick the matching .pub file", file=name)
 
     lines = _read_lines()
     known = {k["fingerprint"] for k in list_keys()}
     found, added = 0, []
-    for line in data.decode("utf-8", "replace").splitlines():
+    for line in text.splitlines():
         key = parse_key(line)
         if not key:
             continue

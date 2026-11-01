@@ -61,11 +61,6 @@ def read(dir_fd: int, name: str, limit: int) -> bytes | None:
     return _read_regular(fd, limit)
 
 
-def read_path(path: str, limit: int) -> bytes:
-    """Contents of a regular file the user picked by path (symlinks are followed)."""
-    return _read_regular(os.open(path, os.O_RDONLY | os.O_NONBLOCK), limit)
-
-
 def write(dir_fd: int, name: str, data: bytes, mode: int, owner: tuple[int, int] | None = None) -> None:
     """Atomically replace `name` in `dir_fd` with `data`.
 
