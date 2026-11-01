@@ -23,6 +23,14 @@ function Content() {
 
   return (
     <>
+      {error && (
+        // Polling failed after an earlier success: say the data below may be stale.
+        <PanelSection>
+          <PanelSectionRow>
+            <div style={{ color: "#e0a33b" }}>{t.refreshFailed(error)}</div>
+          </PanelSectionRow>
+        </PanelSection>
+      )}
       <ServiceSection status={status} refresh={refresh} />
       <StatusSection status={status} />
       <ConnectionSection status={status} refresh={refresh} />

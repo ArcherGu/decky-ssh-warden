@@ -9,6 +9,7 @@ type ErrorMessages = Record<string, (p: Params) => string>;
 const en = {
   loading: "Reading SSH status…",
   loadFailed: (error: string) => `Couldn't read the SSH status: ${error}`,
+  refreshFailed: (error: string) => `Couldn't refresh; what you see may be out of date: ${error}`,
   cancel: "Cancel",
   listSeparator: ", ",
 
@@ -140,6 +141,7 @@ const en = {
 const zhCN: typeof en = {
   loading: "正在读取 SSH 状态…",
   loadFailed: (error) => `读取状态失败：${error}`,
+  refreshFailed: (error) => `刷新失败，下面显示的可能是旧数据：${error}`,
   cancel: "取消",
   listSeparator: "、",
 
