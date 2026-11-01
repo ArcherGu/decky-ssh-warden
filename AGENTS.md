@@ -4,7 +4,7 @@ Guidance for AI agents working on this project. User-facing documentation lives 
 
 ## Project at a glance
 
-SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that manages sshd from the Quick Access Menu in the Steam Deck's Game Mode: on/off, start at boot, auto-off timer, port, password login, password change, and "SSH only on trusted networks".
+SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin that manages sshd from the Quick Access Menu in the Steam Deck's Game Mode: on/off, start at boot, auto-off timer, port, password login, password change, public keys, and "SSH only on trusted networks".
 
 - The plugin runs as **root** (`flags: ["root"]` in `plugin.json`). A backend bug can break the system directly or lock the user out of SSH.
 - Target: SteamOS 3.9, Decky Loader 3.3.x. The backend runs inside Decky's bundled Python 3.14 (a PyInstaller build).
@@ -22,7 +22,8 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 | `py_modules/sshwarden/net.py` | NetworkManager connections, firewalld zones and rules, `sync_ssh_firewall()`, `zones_snapshot()` |
 | `py_modules/sshwarden/port.py` | The full port-change flow (firewall → sshd → cleanup) |
 | `py_modules/sshwarden/trust.py` | Trusted-networks mode |
-| `py_modules/sshwarden/account.py` | Public key count, password change |
+| `py_modules/sshwarden/account.py` | Password change |
+| `py_modules/sshwarden/keys.py` | `~/.ssh/authorized_keys`: parse keys and fingerprints, import from a file, remove |
 | `py_modules/sshwarden/status.py` | Status summary polled by the frontend |
 | `py_modules/sshwarden/cleanup.py` | Undoes every system change the plugin made (used on uninstall) |
 | `py_modules/sshwarden/settings.py` | `~/homebrew/settings/decky-ssh-warden/settings.json` |
@@ -64,6 +65,9 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 - Never lock the user out: disabling password login requires at least one public key; a failed port change rolls back; any action that could cut off the network the user is on needs a confirmation dialog in the frontend.
 - Passwords go to `chpasswd` on stdin only. They must never appear in command arguments, logs or return values.
+- Disabling password login needs at least one key, and removing the last key needs password login on. `keys.remove_key()` checks the second rule itself (it imports `sshd` inside the function because `sshd` imports `keys`).
+- Never read a private key into anything that is stored, logged or returned: `keys.import_file()` rejects files that look like one before parsing them.
+- The plugin runs as root, so files it creates in the deck user's home must be `chown`ed to the deck user (`keys._write_lines()` does this for `~/.ssh` and `authorized_keys`).
 - **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind.
 
 ## Frontend conventions
@@ -98,14 +102,14 @@ Ask the user for the Deck's address and login credentials. **Never write them in
 
 ### Rule one: install the watchdog first
 
-Before any test that could affect SSH access (stopping sshd, changing the port or password, changing the firewall or network zones), **install `dev/deck-guard` on the Deck**. The user is often away from the screen; if the Deck becomes unreachable, nobody can rescue it.
+Before any test that could affect SSH access (stopping sshd, changing the port or password, changing public keys, the firewall or network zones), **install `dev/deck-guard` on the Deck**. The user is often away from the screen; if the Deck becomes unreachable, nobody can rescue it.
 
-- `install.sh` takes a "known good" snapshot of sshd, the deck user's password hash, firewalld and NetworkManager zones (only when the current state is healthy), then enables a systemd timer that runs every minute.
+- `install.sh` takes a "known good" snapshot of sshd, the deck user's password hash, firewalld, NetworkManager zones and `~/.ssh/authorized_keys` (only when the current state is healthy), then enables a systemd timer that runs every minute.
 - If the state differs from the snapshot **and** `~/.ssh-warden-dev/heartbeat` has not been touched for 5 minutes, the watchdog restores the snapshot.
 - **Touch `~/.ssh-warden-dev/heartbeat` at the start of every SSH command**, or the watchdog may restore the snapshot in the middle of a test.
 - After installing, run a deliberate break test to prove it works: first arm an independent fallback with `systemd-run --on-active=8min`, then schedule the breakage with `systemd-run` (so it does not depend on your SSH session), and poll from the development machine until SSH comes back.
-- If a new feature changes system state the watchdog does not cover (for example `~/.ssh/authorized_keys`), **extend the fingerprint and restore logic in `guard.sh` before testing that feature**.
-- When you are done, **you must uninstall it**: `sudo bash dev/deck-guard/uninstall.sh`. Otherwise every setting the user changes in the plugin is reverted after 5 minutes. The uninstall script also deletes the copy of the password hash in the snapshot.
+- The watchdog covers sshd, the password, firewalld, NetworkManager zones and `~/.ssh/authorized_keys`. If a new feature changes system state it does not cover, **extend the fingerprint and restore logic in `guard.sh` before testing that feature**.
+- When you are done, **you must uninstall it**: `sudo bash dev/deck-guard/uninstall.sh`. Otherwise every setting the user changes in the plugin is reverted after 5 minutes. The uninstall script also deletes the copy of the password hash in the snapshot. Uninstall last, after the test cleanup, and stop touching the heartbeat file afterwards (or remove `~/.ssh-warden-dev` again), since touching it recreates the directory.
 
 ### Testing tips
 
@@ -122,12 +126,16 @@ Before any test that could affect SSH access (stopping sshd, changing the port o
   echo '<new password>' | sudo python3 -B -m sshwarden passwd
   sudo python3 -B -m sshwarden trusted-mode on|off
   sudo python3 -B -m sshwarden trust <connection UUID> on|off
+  sudo python3 -B -m sshwarden keys
+  sudo python3 -B -m sshwarden key-import /path/to/key.pub
+  sudo python3 -B -m sshwarden key-remove SHA256:<fingerprint>
   sudo python3 -B -m sshwarden cleanup
   ```
 
 - **Established SSH sessions survive sshd stops, restarts and firewall changes.** Do "stop → check → start again" tests inside a single SSH session.
 - After changing the port, connect on the new port. To undo a password change, write back the **original hash** with `usermod -p "$(cat /var/lib/ssh-warden-dev/baseline/shadow-hash)" deck`; setting the old password again produces a different salt, so the hash would not match the snapshot.
-- To test disabling password login, generate a throwaway key pair on the development machine and add it to the Deck's `authorized_keys`; remove it afterwards, together with `~/.ssh` if the Deck did not have one before.
+- To test disabling password login or the key section, generate throwaway key pairs on the development machine and add them with `key-import` or `ssh-copy-id`; remove them afterwards, together with `~/.ssh` if the Deck did not have one before. With password login off, log in with the throwaway key (`ssh -i ... -o IdentitiesOnly=yes`); `sudo` still takes the password.
+- To test the file picker, put the test `.pub` file directly in `/home/deck` (the picker's start folder) so it is in the first listing.
 - At the end of every test, check `sudo /var/lib/ssh-warden-dev/guard.sh status` reports `changed components: ''`, i.e. the system is fully back to the snapshot.
 - Switching trusted mode takes a few seconds (about 6.5 s on, 4.5 s off) and the toggles are disabled meanwhile. In UI tests, wait for an operation to finish before clicking the next toggle.
 
@@ -189,5 +197,4 @@ python3 cdp.py eval SharedJSContext 'DFL.Navigation.CloseSideMenus()'
 
 ## Known TODOs
 
-- Public key management (import, delete). Only the key count is shown today. The watchdog does not cover `~/.ssh/authorized_keys` yet; extend it before working on this.
 - The auto-off timer is a transient systemd timer and does not survive a reboot.
