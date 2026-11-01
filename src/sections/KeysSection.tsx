@@ -11,6 +11,8 @@ const shortFingerprint = (fingerprint: string) => `${fingerprint.slice(0, 19)}â€
 const REMOVE_BUTTON = { minWidth: 0, width: "auto", padding: "6px 14px" };
 
 function importHint(status: Status) {
+  // The reason is shown above; ssh-copy-id would write through the symlink, so do not suggest it.
+  if (status.keys_unsafe) return undefined;
   const address = status.networks.flatMap((n) => n.addresses)[0];
   // ssh-copy-id is the quickest way, but it logs in with the password.
   if (status.password_auth && status.running && address) {
