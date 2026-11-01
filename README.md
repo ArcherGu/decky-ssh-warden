@@ -13,7 +13,7 @@ A [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) plugin for m
 | Connection | Change the SSH port |
 | Login security | Allow or disallow password login; change the `deck` user's password |
 | Public keys | List the keys that can log in and remove any of them; import keys from a `.pub` file picked on the Deck (e.g. from a USB drive or SD card); shows the `ssh-copy-id` command to run on your computer |
-| Trusted networks | Keep SSH open only on the networks you tick; every other network (e.g. public Wi-Fi) is blocked by the firewall |
+| Trusted networks | Keep SSH open only on the networks you tick; every other network (e.g. public Wi-Fi) is blocked by the firewall, and so are VPNs such as Tailscale |
 
 The panel follows Steam's language: Simplified Chinese when Steam is set to it, English otherwise.
 
@@ -35,6 +35,7 @@ The plugin runs as `root` (`flags: ["root"]` in `plugin.json`), because managing
 
 ## Known limitations
 
+- Trusted mode only lists Wi-Fi and Ethernet connections. VPN interfaces (Tailscale, WireGuard, ...) belong to no zone, so the firewall's default zone handles them, and that zone drops SSH while the mode is on. If you reach the Deck over a VPN, leave trusted mode off.
 - Only two sshd settings are managed: the port and password login. Finer options such as `AllowUsers` are not handled.
 - Auto-off uses a transient systemd timer, so it does not survive a reboot of the Deck.
 
