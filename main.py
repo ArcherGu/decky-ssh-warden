@@ -59,11 +59,15 @@ class Plugin:
     async def _main(self):
         settings.init(decky.DECKY_PLUGIN_SETTINGS_DIR)
         decky.logger.info("SSH Warden loaded")
+        restored = await _call(cleanup.restore_after_update)
+        if restored.get("data"):
+            decky.logger.info("Settings put back after an update: %s", restored["data"])
 
     async def _unload(self):
         decky.logger.info("SSH Warden unloaded")
 
     async def _uninstall(self):
-        # Leave no orphaned firewall zone/rules or sshd drop-in behind.
-        result = await _call(cleanup.revert_all)
+        # Leave no orphaned firewall zone/rules or sshd drop-in behind. Decky also calls this
+        # before an update; the new version then puts the settings back (see cleanup.py).
+        result = await _call(cleanup.uninstall)
         decky.logger.info("SSH Warden uninstalled, cleanup: %s", result)

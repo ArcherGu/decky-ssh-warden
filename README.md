@@ -28,6 +28,7 @@ Turning SSH off, by hand or with the auto-off timer, only stops new connections:
 - **Invisible on public networks.** With "SSH only on trusted networks" on, trusted networks are moved to a dedicated firewall zone, `sshwarden` (a copy of the default zone, so streaming and other features keep working). All other networks drop the SSH port, so a port scan shows nothing there.
 - **Every firewall rule is accounted for.** Each rule the plugin adds is recorded in `~/homebrew/settings/decky-ssh-warden/settings.json`. When the port or mode changes, new rules are added before old ones are removed, so there is no gap and nothing is left behind.
 - **Uninstalling restores the system.** Removing the plugin turns trusted mode off, deletes every firewall rule and the sshd drop-in it created, and cancels a pending auto-off. SSH returns to the system defaults (port 22, password login allowed). Your public keys are yours, so they are kept.
+- **Updates keep your settings.** Decky runs the same uninstall step before every update or reinstall. SSH Warden notes your port, password login, trusted mode and auto-off first, and the new version puts them back when it starts within 10 minutes. For the few seconds of the update itself, SSH runs with the defaults.
 - **Polling only while the panel is open.** Closing the Quick Access Menu stops all background work.
 
 The plugin runs as `root` (`flags: ["root"]` in `plugin.json`), because managing sshd, changing passwords and configuring the firewall all require it.
