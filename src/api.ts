@@ -7,7 +7,16 @@ export interface Network {
   device: string;
   addresses: string[];
   zone: string | null;
+  trusted: boolean;
   ssh_allowed: boolean;
+}
+
+export interface SavedNetwork {
+  name: string;
+  uuid: string;
+  type: "wifi" | "ethernet";
+  active: boolean;
+  trusted: boolean;
 }
 
 export interface Login {
@@ -30,6 +39,8 @@ export interface Status {
   logins: { recent: Login[]; failed: number };
   firewall: boolean;
   networks: Network[];
+  trusted_mode: boolean;
+  saved_networks: SavedNetwork[];
 }
 
 type Result<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -51,6 +62,8 @@ const setAutooffCall = callable<[minutes: number], Result<null>>("set_autooff");
 const setPortCall = callable<[port: number], Result<null>>("set_port");
 const setPasswordAuthCall = callable<[on: boolean], Result<null>>("set_password_auth");
 const changePasswordCall = callable<[newPassword: string], Result<null>>("change_password");
+const setTrustedModeCall = callable<[on: boolean], Result<null>>("set_trusted_mode");
+const setNetworkTrustedCall = callable<[uuid: string, on: boolean], Result<null>>("set_network_trusted");
 
 export const getStatus = () => unwrap(getStatusCall());
 export const setRunning = (on: boolean) => unwrap(setRunningCall(on));
@@ -60,3 +73,5 @@ export const setAutooff = (minutes: number) => unwrap(setAutooffCall(minutes));
 export const setPort = (port: number) => unwrap(setPortCall(port));
 export const setPasswordAuth = (on: boolean) => unwrap(setPasswordAuthCall(on));
 export const changePassword = (newPassword: string) => unwrap(changePasswordCall(newPassword));
+export const setTrustedMode = (on: boolean) => unwrap(setTrustedModeCall(on));
+export const setNetworkTrusted = (uuid: string, on: boolean) => unwrap(setNetworkTrustedCall(uuid, on));

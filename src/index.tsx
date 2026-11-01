@@ -6,6 +6,7 @@ import { ConnectionSection } from "./sections/ConnectionSection";
 import { LoginSection } from "./sections/LoginSection";
 import { ServiceSection } from "./sections/ServiceSection";
 import { StatusSection } from "./sections/StatusSection";
+import { TrustedSection } from "./sections/TrustedSection";
 
 function Content() {
   const { status, error, refresh } = useStatus();
@@ -24,6 +25,7 @@ function Content() {
       <StatusSection status={status} />
       <ConnectionSection status={status} refresh={refresh} />
       <LoginSection status={status} refresh={refresh} />
+      <TrustedSection status={status} refresh={refresh} />
     </>
   );
 }

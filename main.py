@@ -2,7 +2,7 @@ import asyncio
 
 import decky
 
-from sshwarden import account, port, settings, sshd, status
+from sshwarden import account, port, settings, sshd, status, trust
 
 
 async def _call(fn, *args) -> dict:
@@ -38,6 +38,12 @@ class Plugin:
 
     async def change_password(self, new_password: str) -> dict:
         return await _call(account.change_password, str(new_password))
+
+    async def set_trusted_mode(self, on: bool) -> dict:
+        return await _call(trust.set_enabled, bool(on))
+
+    async def set_network_trusted(self, uuid: str, on: bool) -> dict:
+        return await _call(trust.set_network_trusted, str(uuid), bool(on))
 
     async def _main(self):
         settings.init(decky.DECKY_PLUGIN_SETTINGS_DIR)

@@ -10,14 +10,14 @@ def set_port(port: int) -> None:
     old_ports = set(sshd.ports(sshd.effective_config()))
 
     data = settings.load()
-    # Open the firewall first so the new port is never blocked while sshd moves over.
-    net.allow_ssh_port(port, data)
+    # Prepare the firewall for both ports first, so the new one is never blocked while sshd moves.
+    net.sync_ssh_firewall(old_ports | {port}, data)
     settings.save(data)
     try:
         sshd.update_config({"Port": None if port == sshd.DEFAULT_PORT else str(port)})
     except Exception:
-        net.close_ssh_ports(data, keep=old_ports)
+        net.sync_ssh_firewall(old_ports, data)
         settings.save(data)
         raise
-    net.close_ssh_ports(data, keep={port})
+    net.sync_ssh_firewall({port}, data)
     settings.save(data)
