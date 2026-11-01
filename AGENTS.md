@@ -17,15 +17,16 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 | --- | --- |
 | `main.py` | Decky backend entry point. It only forwards: every method is `return await _call(fn, *args)` |
 | `py_modules/sshwarden/proc.py` | The only place that runs system commands: `run()`, `succeeds()`, `split_terse()` |
+| `py_modules/sshwarden/safefile.py` | Reading and writing files under `/home/deck` as root without following symlinks |
 | `py_modules/sshwarden/errors.py` | `UserError`: an error for the user, with a code the panel translates |
 | `py_modules/sshwarden/sshd.py` | sshd service state, on/off, auto-off timer, config read/write (drop-in + validation + rollback), login history |
 | `py_modules/sshwarden/net.py` | NetworkManager connections, firewalld zones and rules, `sync_ssh_firewall()`, `zones_snapshot()` |
 | `py_modules/sshwarden/port.py` | The full port-change flow (firewall → sshd → cleanup) |
 | `py_modules/sshwarden/trust.py` | Trusted-networks mode |
-| `py_modules/sshwarden/account.py` | Password change |
+| `py_modules/sshwarden/account.py` | Password change (needs the current password once one is set) |
 | `py_modules/sshwarden/keys.py` | `~/.ssh/authorized_keys`: parse keys and fingerprints, import from a file, remove |
 | `py_modules/sshwarden/status.py` | Status summary polled by the frontend |
-| `py_modules/sshwarden/cleanup.py` | Undoes every system change the plugin made (used on uninstall) |
+| `py_modules/sshwarden/cleanup.py` | Undoes every system change the plugin made (on uninstall) and puts the user's settings back after an update |
 | `py_modules/sshwarden/settings.py` | `~/homebrew/settings/decky-ssh-warden/settings.json` |
 | `py_modules/sshwarden/__main__.py` | Command-line entry for testing the backend on the Deck without the UI |
 | `src/api.ts` | `callable` wrappers for backend methods and the `Status` type |
@@ -41,6 +42,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 - **Run system commands only through `proc.run()`**, never `subprocess` directly. Decky is a PyInstaller app that points `LD_LIBRARY_PATH` at its bundled libraries, which makes system programs such as `sshd`, `bash` and `nmcli` fail to start; `run()` cleans that up. It also pins `LC_ALL=C` and `PATH` so output stays parseable.
 - Backend functions are synchronous. `_call()` in `main.py` runs them with `asyncio.to_thread` and returns `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`. For errors the user should see, `raise UserError("<code>", "<English message with {params}>", **params)`; `_call()` adds `code` and `params` to the result and the panel shows the translation of that code from `errors` in `src/i18n.ts`, falling back to the English message. `CommandError`, raised by `proc.run()`, is a `UserError` with the code `command_failed`.
+- **Every method that changes something holds the global lock in `main.py`** (`_call()` takes it unless `exclusive=False`, which only the status read uses). Panel sections only disable their own controls, so without it two changes would race on `settings.json` and on checks that must be atomic.
 - **The system is the source of truth**, not `settings.json`. Settings only store two kinds of data: changes the plugin made (so they can be undone) and user preferences (the trusted-network list).
 - Known parsing pitfalls:
   - `sshd -T` prints keys in mixed case (e.g. `PasswordAuthentication yes`); `effective_config()` lower-cases them.
@@ -48,7 +50,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 ### sshd configuration
 
-- **Only edit the plugin's own drop-in**, `/etc/ssh/sshd_config.d/05-ssh-warden.conf`. Never edit `/etc/ssh/sshd_config`. The main config `Include`s the drop-in directory on its second line, and sshd keeps the first value it reads for each option, so the `05-` prefix wins over SteamOS's own `20-` and `99-` files.
+- **Only edit the plugin's own drop-in**, `/etc/ssh/sshd_config.d/05-ssh-warden.conf`. Never edit `/etc/ssh/sshd_config`. The main config `Include`s the drop-in directory on its second line, and for most options sshd keeps the first value it reads, so the `05-` prefix wins over SteamOS's own `20-` and `99-` files. **`Port` is an exception: every `Port` line adds a listening port.** No other file on SteamOS sets `Port` today; if one did, sshd would listen on both ports (which `sshd.ports()` already reports).
 - Managed keys are listed in `sshd.MANAGED_KEYS`. To manage a new sshd option, add it there and change it through `sshd.update_config()`. That function runs `sshd -t`, restarts sshd and checks it is listening on the expected port; if any step fails it restores the previous file and restarts sshd. Do not bypass it.
 - To return an option to the system default, pass `None` to drop it (e.g. port back to 22) instead of writing the default value.
 
@@ -63,12 +65,13 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 ### Safety invariants (new code must keep these)
 
-- Never lock the user out: disabling password login requires at least one public key; a failed port change rolls back; any action that could cut off the network the user is on needs a confirmation dialog in the frontend.
+- **Assume any local process can call the plugin's methods.** Decky serves its auth token at `/auth/token` without authentication, and `/ws` accepts any client that presents it. So a method must never let a program running as deck gain root: that is why changing the password needs the current one (`account.change_password()` checks it with `unix_chkpwd`, as `passwd` would).
+- Never lock the user out: disabling password login requires keys that sshd actually accepts (`sshd.accepts_keys()`: PubkeyAuthentication, AuthorizedKeysFile, AuthenticationMethods); a failed port change rolls back; any action that could cut off the network the user is on needs a confirmation dialog in the frontend.
 - Passwords go to `chpasswd` on stdin only. They must never appear in command arguments, logs or return values.
 - Disabling password login needs at least one key, and removing the last key needs password login on. `keys.remove_key()` checks the second rule itself (it imports `sshd` inside the function because `sshd` imports `keys`).
 - Never read a private key into anything that is stored, logged or returned: `keys.import_file()` rejects files that look like one before parsing them.
-- The plugin runs as root, so files it creates in the deck user's home must be `chown`ed to the deck user (`keys._write_lines()` does this for `~/.ssh` and `authorized_keys`).
-- **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind.
+- **Never touch a path under `/home/deck` with plain `open()`, `chmod()` or `chown()`.** Those directories belong to deck, and anything running as deck could swap in a symlink to `/etc/shadow`. Use `safefile` (directory descriptors, `O_NOFOLLOW`, a random temporary name with `O_EXCL`, `fchmod`/`fchown`, only regular files read). Files the plugin creates there for the user, such as `~/.ssh` and `authorized_keys`, must belong to deck.
+- **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind. Decky also runs `_uninstall` before every update or reinstall (`browser._install()` → `uninstall_plugin()`), so if the user would want the setting back after an update, note it in `cleanup.uninstall()` and re-apply it in `cleanup.restore_after_update()`.
 
 ## Frontend conventions
 
@@ -123,7 +126,7 @@ Before any test that could affect SSH access (stopping sshd, changing the port o
   sudo python3 -B -m sshwarden autooff 30|cancel
   sudo python3 -B -m sshwarden port 2222
   sudo python3 -B -m sshwarden password-auth on|off
-  echo '<new password>' | sudo python3 -B -m sshwarden passwd
+  printf '%s\n%s\n' '<current password>' '<new password>' | sudo python3 -B -m sshwarden passwd
   sudo python3 -B -m sshwarden trusted-mode on|off
   sudo python3 -B -m sshwarden trust <connection UUID> on|off
   sudo python3 -B -m sshwarden keys

@@ -25,6 +25,7 @@ Turning SSH off, by hand or with the auto-off timer, only stops new connections:
 - **No password-login switch-off without keys, and no removing the last key without password login.** Either would leave no way to log in, so the backend refuses and the controls are disabled.
 - **Private keys are rejected.** Picking a private key file by mistake gives an error; its content is never stored or logged. `authorized_keys` is replaced atomically, and the plugin creates `~/.ssh` and the file with the permissions sshd expects.
 - **Passwords are never logged.** The new password is passed to `chpasswd` on stdin, so it never appears in process arguments or logs.
+- **Changing the password needs the current one**, as with `passwd`. Any program running on the Deck can talk to Decky's backend, so without this it could set a password it knows and then use `sudo`.
 - **Invisible on public networks.** With "SSH only on trusted networks" on, trusted networks are moved to a dedicated firewall zone, `sshwarden` (a copy of the default zone, so streaming and other features keep working). All other networks drop the SSH port, so a port scan shows nothing there.
 - **Every firewall rule is accounted for.** Each rule the plugin adds is recorded in `~/homebrew/settings/decky-ssh-warden/settings.json`. When the port or mode changes, new rules are added before old ones are removed, so there is no gap and nothing is left behind.
 - **Uninstalling restores the system.** Removing the plugin turns trusted mode off, deletes every firewall rule and the sshd drop-in it created, and cancels a pending auto-off. SSH returns to the system defaults (port 22, password login allowed). Your public keys are yours, so they are kept.
@@ -79,7 +80,7 @@ AI agents working on this repository should read [AGENTS.md](AGENTS.md) first.
 
 When you test SSH-related features remotely, one mistake can leave the Deck unreachable. `dev/deck-guard` is a development-time watchdog:
 
-- On install it takes a "known good" snapshot of sshd, the `deck` password, firewalld and NetworkManager zones.
+- On install it takes a "known good" snapshot of sshd, the `deck` password, firewalld, NetworkManager zones and `~/.ssh/authorized_keys`.
 - A systemd timer checks every minute. If the state differs from the snapshot **and** `~/.ssh-warden-dev/heartbeat` has not been touched for 5 minutes (meaning the developer can no longer get in), it restores the snapshot.
 - While developing, touch the heartbeat file before every command you run over SSH.
 
