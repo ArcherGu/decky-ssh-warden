@@ -2,10 +2,11 @@ import { PanelSection, PanelSectionRow, staticClasses } from "@decky/ui";
 import { definePlugin } from "@decky/api";
 import { FaUserShield } from "react-icons/fa";
 import { useStatus } from "./useStatus";
+import { ServiceSection } from "./sections/ServiceSection";
 import { StatusSection } from "./sections/StatusSection";
 
 function Content() {
-  const { status, error } = useStatus();
+  const { status, error, refresh } = useStatus();
 
   if (!status) {
     return (
@@ -15,7 +16,12 @@ function Content() {
     );
   }
 
-  return <StatusSection status={status} />;
+  return (
+    <>
+      <ServiceSection status={status} refresh={refresh} />
+      <StatusSection status={status} />
+    </>
+  );
 }
 
 export default definePlugin(() => ({

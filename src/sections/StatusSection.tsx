@@ -20,12 +20,6 @@ export function StatusSection({ status }: { status: Status }) {
   const lastLogin = status.logins.recent[0];
   return (
     <PanelSection title="状态">
-      <PanelSectionRow>
-        <Field label="SSH 服务" bottomSeparator="none">
-          <span style={{ color: status.running ? OK : MUTED }}>{status.running ? "运行中" : "已停止"}</span>
-        </Field>
-      </PanelSectionRow>
-
       {status.config_error && (
         <PanelSectionRow>
           <Field label="配置错误" description={status.config_error} bottomSeparator="none" />

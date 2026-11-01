@@ -25,6 +25,15 @@ def service_state() -> dict:
     }
 
 
+def set_running(on: bool) -> None:
+    # Stopping only closes the listener; established sessions stay connected.
+    run(["systemctl", "start" if on else "stop", UNIT])
+
+
+def set_autostart(on: bool) -> None:
+    run(["systemctl", "enable" if on else "disable", UNIT])
+
+
 def sessions(listen_ports: list[int]) -> list[str]:
     """Remote addresses of established SSH connections."""
     peers = []

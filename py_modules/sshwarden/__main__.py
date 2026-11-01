@@ -5,12 +5,20 @@
 import json
 import sys
 
-from . import status
+from . import sshd, status
+
+
+def on_off(value: str) -> bool:
+    if value not in ("on", "off"):
+        raise SystemExit("expected on|off")
+    return value == "on"
 
 
 def main(argv: list[str]) -> int:
     commands = {
         "status": lambda: status.collect(),
+        "service": lambda v: sshd.set_running(on_off(v)),
+        "autostart": lambda v: sshd.set_autostart(on_off(v)),
     }
     if not argv or argv[0] not in commands:
         print(f"usage: python3 -m sshwarden {{{'|'.join(commands)}}} [args...]", file=sys.stderr)

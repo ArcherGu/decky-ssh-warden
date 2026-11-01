@@ -44,5 +44,9 @@ export function notifyError(e: unknown) {
 }
 
 const getStatusCall = callable<[], Result<Status>>("get_status");
+const setRunningCall = callable<[on: boolean], Result<null>>("set_running");
+const setAutostartCall = callable<[on: boolean], Result<null>>("set_autostart");
 
 export const getStatus = () => unwrap(getStatusCall());
+export const setRunning = (on: boolean) => unwrap(setRunningCall(on));
+export const setAutostart = (on: boolean) => unwrap(setAutostartCall(on));

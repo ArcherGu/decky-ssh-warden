@@ -2,7 +2,7 @@ import asyncio
 
 import decky
 
-from sshwarden import status
+from sshwarden import sshd, status
 
 
 async def _call(fn, *args) -> dict:
@@ -17,6 +17,12 @@ async def _call(fn, *args) -> dict:
 class Plugin:
     async def get_status(self) -> dict:
         return await _call(status.collect)
+
+    async def set_running(self, on: bool) -> dict:
+        return await _call(sshd.set_running, bool(on))
+
+    async def set_autostart(self, on: bool) -> dict:
+        return await _call(sshd.set_autostart, bool(on))
 
     async def _main(self):
         decky.logger.info("SSH Warden loaded")
