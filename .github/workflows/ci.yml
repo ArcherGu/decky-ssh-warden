@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend (typecheck, tests, package)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:frontend
+      - run: pnpm package
+
+  backend:
+    name: Backend (tests, translations, shell syntax)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14" # what Decky Loader bundles
+      - name: Every backend error code is translated
+        run: python scripts/check_i18n.py
+      - name: Unit tests
+        run: PYTHONPATH=py_modules python -m unittest discover -s tests/backend -v
+      - name: Shell scripts parse
+        run: for f in scripts/*.sh dev/deck-guard/*.sh; do bash -n "$f"; done
