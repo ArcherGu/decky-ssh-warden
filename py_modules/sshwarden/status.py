@@ -9,6 +9,7 @@ def collect() -> dict:
         # A broken sshd config must not hide the rest of the status.
         config, config_error = {}, e.params["detail"]
     listen_ports = sshd.ports(config)
+    key_list = keys.list_keys()
 
     fw = net.firewall_running()
     zones = net.zones_snapshot() if fw else {}
@@ -33,7 +34,9 @@ def collect() -> dict:
         "config_error": config_error,
         "password_auth": config.get("passwordauthentication", ["yes"])[0] == "yes",
         "password_set": account.password_set(),
-        "keys": keys.list_keys(),
+        "keys": key_list,
+        # Whether those keys alone can log in, i.e. password login may be turned off.
+        "key_login": bool(key_list) and sshd.accepts_keys(config),
         "sessions": sshd.sessions(listen_ports),
         "logins": sshd.login_history(),
         "firewall": fw,

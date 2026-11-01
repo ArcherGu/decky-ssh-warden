@@ -8,13 +8,14 @@ import { useAction } from "../useAction";
 function passwordAuthHint(status: Status) {
   const count = status.keys.length;
   if (count === 0) return t.login.noKeys;
+  if (status.password_auth && !status.key_login) return t.login.keysNotAccepted;
   return status.password_auth ? t.login.keysWithPassword(count) : t.login.keysOnly(count);
 }
 
 export function LoginSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
   const { busy, run } = useAction(refresh);
   // Never offer to switch password login off when that would lock everyone out.
-  const lockedOn = status.password_auth && status.keys.length === 0;
+  const lockedOn = status.password_auth && !status.key_login;
 
   const submitPassword = (current: string, password: string) =>
     run(async () => {

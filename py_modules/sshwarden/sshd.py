@@ -129,11 +129,37 @@ def password_auth_enabled() -> bool:
     return effective_config().get("passwordauthentication", ["yes"])[0] == "yes"
 
 
+# How sshd -T prints AuthorizedKeysFile entries that mean the deck user's ~/.ssh/authorized_keys.
+_OUR_KEYS_FILE = {".ssh/authorized_keys", "%h/.ssh/authorized_keys", "~/.ssh/authorized_keys"}
+
+
+def accepts_keys(config: dict[str, list[str]]) -> bool:
+    """Whether sshd lets a key from ~/.ssh/authorized_keys log in on its own.
+
+    Not the case when PubkeyAuthentication is off, AuthorizedKeysFile points elsewhere, or
+    AuthenticationMethods also demands a password. Restrictions on single keys (from="...")
+    cannot be judged here and are not considered.
+    """
+    files = " ".join(config.get("authorizedkeysfile", [])).split()
+    methods = " ".join(config.get("authenticationmethods", ["any"])).split()
+    return (
+        config.get("pubkeyauthentication", ["yes"])[0] != "no"
+        and bool(_OUR_KEYS_FILE.intersection(files))
+        and ("any" in methods or "publickey" in methods)
+    )
+
+
 def set_password_auth(on: bool) -> None:
     if not on and not has_authorized_keys():
         raise UserError(
             "no_authorized_keys",
             "No SSH public key is set up; without password login nobody could log in over SSH",
+        )
+    if not on and not accepts_keys(effective_config()):
+        raise UserError(
+            "keys_not_accepted",
+            "sshd does not accept keys from ~/.ssh/authorized_keys on their own "
+            "(PubkeyAuthentication, AuthorizedKeysFile or AuthenticationMethods)",
         )
     # "yes" is sshd's default, so turning it back on just drops our override.
     update_config({"PasswordAuthentication": None if on else "no"})

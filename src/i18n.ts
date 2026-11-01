@@ -61,6 +61,8 @@ const en = {
     noKeys: "No SSH public key yet. Add one below before turning password login off.",
     keysWithPassword: (n: number) =>
       `${n === 1 ? "1 public key" : `${n} public keys`} set up. Turn off to allow key login only.`,
+    keysNotAccepted:
+      "sshd doesn't accept keys on their own (PubkeyAuthentication, AuthorizedKeysFile or AuthenticationMethods), so password login must stay on",
     keysOnly: (n: number) => `Key login only (${n === 1 ? "1 public key" : `${n} public keys`})`,
     changePassword: (user: string) => `Change ${user}'s password`,
     passwordChanged: (user: string) => `Password for ${user} changed`,
@@ -123,6 +125,8 @@ const en = {
     sshd_not_listening: (p) => `sshd did not start listening on port ${p.ports}; the previous settings were restored`,
     no_authorized_keys: () => "No SSH public key is set up; without password login nobody could log in over SSH",
     autooff_range: (p) => `Auto-off must be 1 to ${p.max} minutes away`,
+    keys_not_accepted: () =>
+      "sshd doesn't accept keys on their own (PubkeyAuthentication, AuthorizedKeysFile or AuthenticationMethods); password login must stay on",
     firewall_not_running: () => "The firewall (firewalld) is not running, so SSH can't be limited by network",
     key_file_unreadable: (p) => `Can't read ${p.file}: ${p.reason}`,
     key_file_private: (p) => `${p.file} is a private key; pick the matching .pub file`,
@@ -185,6 +189,8 @@ const zhCN: typeof en = {
     passwordAuth: "允许密码登录",
     noKeys: "未配置 SSH 公钥，需先在下方添加公钥才能关闭密码登录",
     keysWithPassword: (n) => `已配置 ${n} 个公钥，关闭后只能用公钥登录`,
+    keysNotAccepted:
+      "sshd 目前不接受单独用公钥登录（PubkeyAuthentication、AuthorizedKeysFile 或 AuthenticationMethods 设置），不能关闭密码登录",
     keysOnly: (n) => `只允许公钥登录（已配置 ${n} 个公钥）`,
     changePassword: (user) => `修改 ${user} 密码`,
     passwordChanged: (user) => `${user} 的密码已修改`,
@@ -241,6 +247,8 @@ const zhCN: typeof en = {
     sshd_not_listening: (p) => `sshd 没有在端口 ${p.ports} 上启动，已恢复原配置`,
     no_authorized_keys: () => "还没有配置 SSH 公钥，关闭密码登录后将无法再通过 SSH 登录",
     autooff_range: (p) => `自动关闭时间需在 1 到 ${p.max} 分钟之间`,
+    keys_not_accepted: () =>
+      "sshd 目前不接受单独用公钥登录（PubkeyAuthentication、AuthorizedKeysFile 或 AuthenticationMethods 设置），不能关闭密码登录",
     firewall_not_running: () => "防火墙（firewalld）没有运行，无法按网络限制 SSH",
     key_file_unreadable: (p) => `无法读取 ${p.file}：${p.reason}`,
     key_file_private: (p) => `${p.file} 是私钥，请选择对应的 .pub 文件`,

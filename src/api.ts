@@ -44,6 +44,8 @@ export interface Status {
   /** Whether the deck user has a password; changing it then needs the current one. */
   password_set: boolean;
   keys: PublicKey[];
+  /** Whether sshd lets these keys log in on their own, so password login may be turned off. */
+  key_login: boolean;
   sessions: string[];
   logins: { recent: Login[]; failed: number };
   firewall: boolean;
