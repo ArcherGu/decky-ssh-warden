@@ -7,7 +7,7 @@ def collect() -> dict:
         config, config_error = sshd.effective_config(), None
     except CommandError as e:
         # A broken sshd config must not hide the rest of the status.
-        config, config_error = {}, str(e)
+        config, config_error = {}, e.params["detail"]
     listen_ports = sshd.ports(config)
 
     fw = net.firewall_running()

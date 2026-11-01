@@ -1,11 +1,14 @@
 import os
 import subprocess
 
+from .errors import UserError
+
 SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 
-class CommandError(Exception):
-    pass
+class CommandError(UserError):
+    def __init__(self, command: str, detail: str):
+        super().__init__("command_failed", "{command} failed: {detail}", command=command, detail=detail)
 
 
 def _system_env() -> dict[str, str]:
@@ -36,11 +39,11 @@ def run(args: list[str], *, input: str | None = None, check: bool = True, timeou
         )
     except (OSError, subprocess.TimeoutExpired) as e:
         if check:
-            raise CommandError(f"{args[0]}: {e}") from e
+            raise CommandError(args[0], str(e)) from e
         return ""
     if check and proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip()
-        raise CommandError(f"{' '.join(args)} 失败（{proc.returncode}）：{detail}")
+        detail = (proc.stderr or proc.stdout).strip() or f"exit status {proc.returncode}"
+        raise CommandError(" ".join(args), detail)
     return proc.stdout
 
 

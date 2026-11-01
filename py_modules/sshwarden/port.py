@@ -1,12 +1,13 @@
 from . import net, settings, sshd
+from .errors import UserError
 
 
 def set_port(port: int) -> None:
     if not 1 <= port <= 65535:
-        raise ValueError("端口需在 1 到 65535 之间")
+        raise UserError("port_range", "The port must be between 1 and 65535")
     owner = sshd.port_owner(port)
     if owner:
-        raise ValueError(f"端口 {port} 已被 {owner} 占用")
+        raise UserError("port_in_use", "Port {port} is already used by {owner}", port=port, owner=owner)
     old_ports = set(sshd.ports(sshd.effective_config()))
 
     data = settings.load()

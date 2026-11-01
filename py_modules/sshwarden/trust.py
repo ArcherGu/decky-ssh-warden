@@ -1,5 +1,6 @@
 """Trusted networks: allow SSH only on networks the user marked as trusted."""
 from . import net, settings, sshd
+from .errors import UserError
 from .net import TRUSTED_ZONE
 
 
@@ -9,7 +10,7 @@ def _ssh_ports() -> set[int]:
 
 def _require_firewall() -> None:
     if not net.firewall_running():
-        raise ValueError("防火墙（firewalld）没有运行，无法按网络限制 SSH")
+        raise UserError("firewall_not_running", "The firewall (firewalld) is not running, so SSH cannot be limited by network")
 
 
 def is_enabled(data: dict) -> bool:

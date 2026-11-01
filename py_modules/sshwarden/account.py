@@ -1,6 +1,7 @@
 import os
 
 from . import DECK_USER
+from .errors import UserError
 from .proc import run
 
 AUTHORIZED_KEYS = f"/home/{DECK_USER}/.ssh/authorized_keys"
@@ -23,8 +24,13 @@ def has_authorized_keys() -> bool:
 def change_password(new_password: str) -> None:
     """Set the deck user's password (also the sudo password)."""
     if not MIN_PASSWORD_LENGTH <= len(new_password) <= MAX_PASSWORD_LENGTH:
-        raise ValueError(f"密码长度需在 {MIN_PASSWORD_LENGTH} 到 {MAX_PASSWORD_LENGTH} 个字符之间")
+        raise UserError(
+            "password_length",
+            "The password must be {min} to {max} characters long",
+            min=MIN_PASSWORD_LENGTH,
+            max=MAX_PASSWORD_LENGTH,
+        )
     if any(ord(c) < 32 or ord(c) == 127 for c in new_password):
-        raise ValueError("密码不能包含换行等控制字符")
+        raise UserError("password_control_chars", "The password must not contain control characters such as line breaks")
     # Passed on stdin so it never shows up in the process list or logs.
     run(["chpasswd"], input=f"{DECK_USER}:{new_password}\n")

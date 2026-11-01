@@ -3,6 +3,7 @@ import asyncio
 import decky
 
 from sshwarden import account, cleanup, port, settings, sshd, status, trust
+from sshwarden.errors import UserError
 
 
 async def _call(fn, *args) -> dict:
@@ -11,7 +12,11 @@ async def _call(fn, *args) -> dict:
         return {"ok": True, "data": await asyncio.to_thread(fn, *args)}
     except Exception as e:
         decky.logger.exception("%s failed", getattr(fn, "__name__", fn))
-        return {"ok": False, "error": str(e)}
+        result = {"ok": False, "error": str(e)}
+        if isinstance(e, UserError):
+            # The panel shows these in the user's language.
+            result.update(code=e.code, params=e.params)
+        return result
 
 
 class Plugin:

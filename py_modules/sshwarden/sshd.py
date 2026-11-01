@@ -4,7 +4,8 @@ import re
 import time
 
 from .account import has_authorized_keys
-from .proc import CommandError, run
+from .errors import UserError
+from .proc import run
 
 UNIT = "sshd.service"
 AUTOOFF_UNIT = "ssh-warden-autooff"
@@ -90,7 +91,11 @@ def update_config(changes: dict[str, str | None]) -> None:
             deadline = time.monotonic() + 5
             while not all(_listening(p) for p in expected):
                 if time.monotonic() > deadline:
-                    raise CommandError(f"sshd 没有在端口 {expected} 上启动")
+                    raise UserError(
+                        "sshd_not_listening",
+                        "sshd did not start listening on port {ports}; the previous settings were restored",
+                        ports=", ".join(map(str, expected)),
+                    )
                 time.sleep(0.2)
     except Exception:
         if previous is None:
@@ -106,7 +111,10 @@ def update_config(changes: dict[str, str | None]) -> None:
 
 def set_password_auth(on: bool) -> None:
     if not on and not has_authorized_keys():
-        raise ValueError("还没有配置 SSH 公钥，关闭密码登录后将无法再通过 SSH 登录")
+        raise UserError(
+            "no_authorized_keys",
+            "No SSH public key is set up; without password login nobody could log in over SSH",
+        )
     # "yes" is sshd's default, so turning it back on just drops our override.
     update_config({"PasswordAuthentication": None if on else "no"})
 
@@ -137,7 +145,7 @@ def set_running(on: bool) -> None:
 def schedule_autooff(minutes: int) -> None:
     """Stop sshd `minutes` from now with a transient systemd timer (survives Decky restarts)."""
     if not 1 <= minutes <= MAX_AUTOOFF_MINUTES:
-        raise ValueError(f"自动关闭时间需在 1 到 {MAX_AUTOOFF_MINUTES} 分钟之间")
+        raise UserError("autooff_range", "Auto-off must be 1 to {max} minutes away", max=MAX_AUTOOFF_MINUTES)
     cancel_autooff()
     run([
         "systemd-run",
