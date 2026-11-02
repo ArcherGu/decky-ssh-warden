@@ -44,17 +44,28 @@
 
 ## 安装
 
-在电脑上构建并打包：
+SSH Warden 没有上架 Decky 插件商店，需要从 [GitHub Releases](https://github.com/ArcherGu/decky-ssh-warden/releases) 手动安装。
+
+1. 在游戏模式中打开 Decky 的设置，在「通用」页打开 **开发者模式**。
+2. 在「开发者」页的「第三方插件」下，在 **从 URL 安装插件** 中填入下面的地址，然后选择 **安装**：
+
+   ```
+   https://github.com/ArcherGu/decky-ssh-warden/releases/latest/download/decky-ssh-warden.zip
+   ```
+
+   这个地址始终指向最新版本。也可以先下载这个 zip，改用 **从 ZIP 压缩文件安装插件**。
+3. 确认安装后，Decky 的插件列表里就会出现 SSH Warden。
+
+更新时，用同一个地址再安装一次即可，设置会保留（见上文「更新不丢设置」）。手动安装的插件不会通过商店自动更新。
+
+### 自己构建
 
 ```bash
 pnpm install
 pnpm package      # 生成 out/decky-ssh-warden.zip
 ```
 
-然后任选一种方式安装：
-
-- 在 Deck 的 Decky「设置 → 开发者」中打开开发者模式，用「从 ZIP 安装插件」选择 `out/decky-ssh-warden.zip`。
-- 或者通过 SSH 一键部署（sudo 时需要输入 deck 用户密码）：
+然后按上面的方法用 **从 ZIP 压缩文件安装插件** 安装 `out/decky-ssh-warden.zip`，或者通过 SSH 一键部署（sudo 时需要输入 deck 用户密码）：
 
   ```bash
   scripts/deploy.sh deck@<deck 的 IP>
@@ -69,6 +80,13 @@ pnpm test         # 前端和后端单元测试（后端需要 Python 3.10+）
 ```
 
 每次推送都会在 CI 中运行类型检查、测试、翻译检查和打包，打出的 `decky-ssh-warden.zip` 会作为该次运行的产物保留 14 天，可以直接下载。
+
+发布新版本时，先修改 `package.json` 里的 `version` 并提交，再推送对应的标签；Release 工作流会重新检查一遍并打包，把 zip 附在新建的 GitHub Release 上：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 - 前端：`src/`（React + `@decky/ui`），每个区块一个文件，放在 `src/sections/`。
 - 后端：`main.py` 只做转发，逻辑都在 `py_modules/sshwarden/`。可以不经过界面直接在 Deck 上测试：

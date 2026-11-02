@@ -44,17 +44,28 @@ The plugin runs as `root` (`flags: ["root"]` in `plugin.json`), because managing
 
 ## Installation
 
-Build and package on your computer:
+SSH Warden is not in the Decky plugin store; it is installed by hand from [GitHub Releases](https://github.com/ArcherGu/decky-ssh-warden/releases).
+
+1. In Game Mode, open Decky's settings and turn on **Developer mode** (General page).
+2. On the **Developer** page, under "Third-Party Plugins", enter this URL in **Install Plugin from URL** and select **Install**:
+
+   ```
+   https://github.com/ArcherGu/decky-ssh-warden/releases/latest/download/decky-ssh-warden.zip
+   ```
+
+   It always points to the latest release. You can also download that zip and use **Install Plugin from ZIP File** instead.
+3. Confirm the installation. Decky shows SSH Warden in its plugin list.
+
+To update, install from the same URL again; your settings are kept (see "Updates keep your settings" above). Manually installed plugins are not updated by the store.
+
+### Building it yourself
 
 ```bash
 pnpm install
 pnpm package      # produces out/decky-ssh-warden.zip
 ```
 
-Then install it either way:
-
-- On the Deck, enable Developer Mode in Decky's Settings → Developer, then use "Install Plugin from ZIP" and pick `out/decky-ssh-warden.zip`.
-- Or deploy over SSH in one step (sudo will ask for the deck user's password):
+Then install `out/decky-ssh-warden.zip` with **Install Plugin from ZIP File** as above, or deploy over SSH in one step (sudo will ask for the deck user's password):
 
   ```bash
   scripts/deploy.sh deck@<deck-ip>
@@ -69,6 +80,13 @@ pnpm test         # frontend and backend unit tests (the backend needs Python 3.
 ```
 
 CI runs the typecheck, the tests, a translation check and the package build on every push, and keeps that run's `decky-ssh-warden.zip` as a downloadable artifact for 14 days.
+
+To publish a release, set `version` in `package.json`, commit, then push a matching tag; the Release workflow checks the build again and attaches the zip to a new GitHub release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 - Frontend: `src/` (React + `@decky/ui`), one file per panel section in `src/sections/`.
 - Backend: `main.py` only forwards calls; the logic lives in `py_modules/sshwarden/`. You can test it on the Deck without the UI:
