@@ -60,3 +60,22 @@ class LockTest(TempDirTest):
             self.assertTrue(idle)
         with lock.changes(), lock.unless_busy() as idle:
             self.assertFalse(idle)
+
+    def test_reads_at_the_same_time_do_not_take_each_other_for_a_change(self):
+        with lock.unless_busy() as first, lock.unless_busy() as second:
+            self.assertEqual((first, second), (True, True))
+
+    def test_a_change_waits_for_a_read(self):
+        events = []
+
+        def change():
+            with lock.changes():
+                events.append("change")
+
+        with lock.unless_busy():
+            thread = threading.Thread(target=change)
+            thread.start()
+            time.sleep(0.2)
+            events.append("read done")
+        thread.join(5)
+        self.assertEqual(events, ["read done", "change"])

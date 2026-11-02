@@ -25,14 +25,16 @@ def changes():
 
 @contextlib.contextmanager
 def unless_busy():
-    """Hold the lock only if nobody does right now; yields whether it is held.
+    """Hold the lock shared, unless a change holds it right now; yields whether it is held.
 
     For reads that must not see a change halfway (see status.py), without making them wait.
+    Shared, so reads at the same time (the panel's poll and a refresh, the command line) do
+    not take each other for a change; a change waits for them to finish.
     """
     fd = os.open(PATH, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
             held = True
         except BlockingIOError:
             held = False
