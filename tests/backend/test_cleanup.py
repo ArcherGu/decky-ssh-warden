@@ -63,12 +63,22 @@ class RestoreTest(TempDirTest):
 
 
 class UninstallTest(TempDirTest):
-    def test_notes_the_settings_before_reverting(self):
+    def setUp(self):
+        super().setUp()
         self.patch(sshd, "read_managed", lambda: {"Port": "2222", "PasswordAuthentication": "no"})
-        self.patch(trust, "is_enabled", lambda data: True)
         self.patch(sshd, "autooff_deadline", lambda: 1234.0)
-        seen = []
-        self.patch(cleanup, "revert_all", lambda: seen.append(settings.load()[cleanup.NOTE]))
+        self.seen = []
+        self.patch(cleanup, "revert_all", lambda: self.seen.append(settings.load()[cleanup.NOTE]))
+
+    def test_notes_the_settings_before_reverting(self):
+        settings.save({"trusted_mode": True})
         cleanup.uninstall()
-        note = seen[0]
+        note = self.seen[0]
         self.assertEqual((note["port"], note["password_auth"], note["trusted_mode"], note["autooff_at"]), ("2222", False, True, 1234.0))
+
+    def test_notes_the_saved_trusted_mode_even_with_its_zone_lost(self):
+        # The panel shows trusted mode on (and offers a repair); an update must not switch it off.
+        settings.save({"trusted_mode": True})
+        self.patch(trust, "is_enabled", lambda data: False)
+        cleanup.uninstall()
+        self.assertTrue(self.seen[0]["trusted_mode"])

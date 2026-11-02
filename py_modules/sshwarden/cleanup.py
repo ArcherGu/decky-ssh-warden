@@ -49,7 +49,8 @@ def _note_settings() -> None:
         "at": time.time(),
         "port": managed.get("Port"),
         "password_auth": managed.get("PasswordAuthentication") != "no",
-        "trusted_mode": trust.is_enabled(data),
+        # The saved mode, as the panel shows it; restoring recreates a lost zone.
+        "trusted_mode": bool(data.get("trusted_mode")),
         "autooff_at": sshd.autooff_deadline(),
     }
     settings.save(data)
