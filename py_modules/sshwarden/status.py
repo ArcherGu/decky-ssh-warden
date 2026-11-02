@@ -22,7 +22,7 @@ def collect() -> dict:
     with lock.unless_busy() as idle:
         zones = net.zones_snapshot() if fw else {}
         data = settings.load()
-    missing = net.missing_rules(data.get("firewall", []), zones) if fw and idle else []
+    unsynced = net.out_of_sync(data, zones) if fw and idle else []
     default_zone = next((name for name, z in zones.items() if z["default"]), None)
     zone_of_device = {dev: name for name, z in zones.items() for dev in z["interfaces"]}
 
@@ -50,10 +50,11 @@ def collect() -> dict:
         "sessions": sshd.sessions(listen_ports),
         "logins": sshd.login_history(),
         "firewall": fw,
-        # Rules the plugin added that firewalld no longer has; the panel offers to repair them.
-        "firewall_missing": len(missing),
+        # Where the firewall differs from the saved mode; the panel offers to repair it.
+        "firewall_out_of_sync": len(unsynced),
         "networks": networks,
-        # Same rule as trust.is_enabled(), from the snapshot instead of extra firewall-cmd calls.
-        "trusted_mode": bool(data.get("trusted_mode")) and net.TRUSTED_ZONE in zones,
+        # The saved mode, which trust.repair_firewall() applies: the panel decides from this
+        # whether a repair needs confirming. A missing zone shows up in firewall_out_of_sync.
+        "trusted_mode": fw and bool(data.get("trusted_mode")),
         "saved_networks": [{**n, "trusted": n["uuid"] in trusted_ids} for n in net.saved_networks()],
     }

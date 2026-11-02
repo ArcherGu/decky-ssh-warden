@@ -1,8 +1,11 @@
 """Firewall bookkeeping and trusted mode, against FakeNetwork."""
+from unittest import mock
+
 from helpers import FakeNetwork, TempDirTest
-from sshwarden import cleanup, net, settings, sshd, trust
+from sshwarden import account, cleanup, keys, net, settings, sshd, status, trust
 from sshwarden.proc import CommandError
 
+DROP_22 = 'rule port port="22" protocol="tcp" drop'
 DROP_222 = 'rule port port="222" protocol="tcp" drop'
 
 
@@ -112,11 +115,11 @@ class TrustedModeTest(NetTest):
         self.assertEqual(self.fw.connections["uuid-home"]["zone"], "")
 
 
-class MissingRulesTest(NetTest):
+class OutOfSyncTest(NetTest):
     """Recorded rules firewalld lacks, e.g. the plugin was killed between recording and adding."""
 
     def missing(self):
-        return net.missing_rules(self.records(), net.zones_snapshot())
+        return net.out_of_sync(settings.load(), net.zones_snapshot())
 
     def setUp(self):
         super().setUp()
@@ -146,17 +149,127 @@ class MissingRulesTest(NetTest):
         trust.set_enabled(True)
         for config in (self.fw.permanent, self.fw.runtime):
             del config[net.TRUSTED_ZONE]
-        self.assertIn({"zone": net.TRUSTED_ZONE, "kind": "port", "port": 222}, self.missing())
+        self.assertEqual(self.missing(), [{"zone": net.TRUSTED_ZONE, "kind": "zone"},
+                                          {"zone": net.TRUSTED_ZONE, "kind": "port", "port": 222}])
         trust.repair_firewall()
         self.assertTrue(self.fw.has(net.TRUSTED_ZONE, "ports", "222/tcp"))
         self.assertEqual(self.fw.zone_of("wlan0"), net.TRUSTED_ZONE)
         self.assertEqual(self.missing(), [])
 
 
+def killed_in(name, after=False):
+    """Patch net.<name> to stop the plugin there, as Decky's SIGKILL would (before or after it runs)."""
+    real = getattr(net, name)
+
+    def killed(*args):
+        if after:
+            real(*args)
+        raise KeyboardInterrupt
+
+    return mock.patch.object(net, name, killed)
+
+
+class InterruptedSwitchTest(NetTest):
+    """The plugin is killed while switching trusted mode. Only "Cafe" is trusted; the Deck is on "Home"."""
+
+    def setUp(self):
+        super().setUp()
+        trust.set_network_trusted("uuid-cafe", True)
+        trust.set_enabled(True)
+        self.assertTrue(self.fw.has("public", "rich", DROP_22))
+
+    def switch(self, on, killed):
+        with killed, self.assertRaises(KeyboardInterrupt):
+            trust.set_enabled(on)
+
+    def unsynced(self):
+        return net.out_of_sync(settings.load(), net.zones_snapshot())
+
+    def panel(self):
+        self.patch(sshd, "effective_config", lambda: {})
+        self.patch(sshd, "service_state", lambda: {"running": True, "autostart": True})
+        self.patch(sshd, "autooff_deadline", lambda: None)
+        self.patch(sshd, "sessions", lambda ports: [])
+        self.patch(sshd, "login_history", lambda: {"recent": [], "failed": 0})
+        self.patch(sshd, "accepts_keys", lambda config: False)
+        self.patch(keys, "list_keys", lambda: [])
+        self.patch(account, "password_set", lambda: True)
+        result = status.collect()
+        home = next(n for n in result["networks"] if n["uuid"] == "uuid-home")
+        return result["trusted_mode"], result["firewall_out_of_sync"], home["trusted"], home["ssh_allowed"]
+
+    def assert_off(self):
+        self.assertFalse(self.fw.has("public", "rich", DROP_22))
+        self.assertNotIn(net.TRUSTED_ZONE, self.fw.permanent)
+        self.assertEqual(self.fw.connections["uuid-cafe"]["zone"], "")
+        self.assertEqual(self.records(), [])
+        self.assertEqual(self.unsynced(), [])
+
+    def test_off_killed_before_its_last_save_is_finished_not_undone(self):
+        self.switch(False, killed_in("delete_trusted_zone", after=True))
+        self.assertFalse(self.fw.has("public", "rich", DROP_22))
+        # The panel shows trusted mode off and offers a repair, which needs no confirmation...
+        self.assertEqual(self.panel(), (False, 1, False, True))
+        self.assertEqual(self.unsynced(), [{"zone": "public", "kind": "block", "port": 22}])
+        # ...because it finishes switching off instead of blocking SSH on Home again.
+        trust.repair_firewall()
+        self.assert_off()
+
+    def test_off_killed_before_anything_changed_is_noticed(self):
+        self.switch(False, killed_in("sync_ssh_firewall"))
+        self.assertTrue(self.fw.has("public", "rich", DROP_22))
+        self.assertFalse(settings.load()["trusted_mode"])
+        # No recorded rule is missing, yet the zone and the drop rule should not be there.
+        self.assertEqual(self.unsynced(), [{"zone": net.TRUSTED_ZONE, "kind": "zone"},
+                                           {"zone": "public", "kind": "block", "port": 22}])
+        trust.repair_firewall()
+        self.assert_off()
+
+    def test_on_killed_before_it_was_saved_is_undone(self):
+        trust.set_enabled(False)
+        self.switch(True, killed_in("sync_ssh_firewall"))
+        self.assertIn(net.TRUSTED_ZONE, self.fw.permanent)
+        self.assertEqual(self.unsynced(), [{"zone": net.TRUSTED_ZONE, "kind": "zone"}])
+        trust.repair_firewall()
+        self.assert_off()
+
+    def test_the_panel_confirms_when_the_repair_blocks_the_current_network(self):
+        self.fw.runtime["public"]["rich"].discard(DROP_22)
+        # Trusted mode is on, Home is untrusted and open: StatusSection asks before repairing.
+        self.assertEqual(self.panel(), (True, 1, False, True))
+        trust.repair_firewall()
+        self.assertTrue(self.fw.has("public", "rich", DROP_22))
+        self.assertEqual(self.panel(), (True, 0, False, False))
+
+    def test_a_lost_zone_is_shown_with_the_saved_mode(self):
+        for config in (self.fw.permanent, self.fw.runtime):
+            del config[net.TRUSTED_ZONE]
+        # Still on, as the user left it; the repair recreates the zone.
+        self.assertEqual(self.panel()[:2], (True, 1))
+        trust.repair_firewall()
+        self.assertEqual(self.fw.connections["uuid-cafe"]["zone"], net.TRUSTED_ZONE)
+        self.assertEqual(self.unsynced(), [])
+
+
 class RevertAllTest(NetTest):
-    def test_removes_every_rule_zone_and_record(self):
+    def setUp(self):
+        super().setUp()
         self.patch(sshd, "cancel_autooff", lambda: None)
         self.patch(sshd, "DROPIN", self.path("no-dropin"))
+
+    def test_removes_the_zone_an_interrupted_switch_off_left(self):
+        trust.set_network_trusted("uuid-cafe", True)
+        trust.set_enabled(True)
+        with killed_in("sync_ssh_firewall"), self.assertRaises(KeyboardInterrupt):
+            trust.set_enabled(False)
+        cleanup.revert_all()
+        self.assertNotIn(net.TRUSTED_ZONE, self.fw.permanent)
+        self.assertEqual(self.fw.connections["uuid-cafe"]["zone"], "")
+        for config in (self.fw.permanent, self.fw.runtime):
+            self.assertEqual(config["public"]["rich"], set())
+        self.assertEqual(self.records(), [])
+
+    def test_removes_every_rule_zone_and_record(self):
         self.ports = {222}
         self.sync({222})
         trust.set_network_trusted("uuid-home", True)

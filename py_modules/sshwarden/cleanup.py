@@ -26,13 +26,11 @@ RUN_DIR = "/run/ssh-warden-uninstall"  # /run is writable by root only
 
 def revert_all() -> None:
     sshd.cancel_autooff()
-    data = settings.load()
     if net.firewall_running():
-        if trust.is_enabled(data):
-            trust.set_enabled(False)
-            data = settings.load()
+        # Even when trusted mode is off: an interrupted switch can leave its zone behind.
+        trust.set_enabled(False)
         # Remove any remaining rules we added (e.g. a port opened for a custom SSH port).
-        data["trusted_mode"] = False
+        data = settings.load()
         net.sync_ssh_firewall(set(), data)
         settings.save(data)
     # Back to the system's sshd defaults (port 22, password login allowed).

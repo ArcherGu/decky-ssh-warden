@@ -31,9 +31,9 @@ const en = {
   status: {
     title: "Status",
     configError: "Config error",
-    firewallMissing: "Firewall rules missing",
-    firewallMissingHint: (n: number) =>
-      `${n === 1 ? "A rule" : `${n} rules`} SSH Warden added to the firewall ${n === 1 ? "is" : "are"} gone, so SSH may be blocked or open on the wrong networks`,
+    firewallOutOfSync: "Firewall out of sync",
+    firewallOutOfSyncHint: (n: number) =>
+      `The firewall differs from SSH Warden's settings in ${n === 1 ? "one place" : `${n} places`}, so SSH may be blocked or open on the wrong networks`,
     repair: "Repair",
     repairTitle: "SSH will be blocked on this network",
     repairBody: (names: string) =>
@@ -176,8 +176,8 @@ const zhCN: typeof en = {
   status: {
     title: "状态",
     configError: "配置错误",
-    firewallMissing: "防火墙规则缺失",
-    firewallMissingHint: (n) => `SSH Warden 添加的 ${n} 条防火墙规则不见了，SSH 可能在不该拦截的网络被拦截，或在不该开放的网络开放`,
+    firewallOutOfSync: "防火墙规则不一致",
+    firewallOutOfSyncHint: (n) => `防火墙有 ${n} 处和 SSH Warden 的设置不一致，SSH 可能在不该拦截的网络被拦截，或在不该开放的网络开放`,
     repair: "修复",
     repairTitle: "修复后当前网络将拦截 SSH",
     repairBody: (names) =>

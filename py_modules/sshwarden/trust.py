@@ -30,7 +30,10 @@ def set_enabled(on: bool) -> None:
         data["trusted_mode"] = True
         net.sync_ssh_firewall(_ssh_ports(), data)
     else:
+        # Saved before anything changes, so a repair after an interruption finishes switching
+        # off, as the user asked, instead of switching back on (net.out_of_sync() spots it).
         data["trusted_mode"] = False
+        settings.save(data)
         net.sync_ssh_firewall(_ssh_ports(), data)
         for uuid in known:
             if net.connection_zone(uuid) == TRUSTED_ZONE:
@@ -40,10 +43,12 @@ def set_enabled(on: bool) -> None:
 
 
 def repair_firewall() -> None:
-    """Put back recorded firewall rules that went missing (see net.missing_rules()).
+    """Make the firewall match the saved mode again (see net.out_of_sync()).
 
-    Applying the current mode again does it: sync_ssh_firewall() adds every recorded rule that
-    is still wanted, and turning trusted mode on also recreates a missing zone.
+    Applying that mode again does it: sync_ssh_firewall() adds every recorded rule that is
+    still wanted and removes the others, turning trusted mode on recreates a missing zone, and
+    turning it off removes a leftover one. The panel shows the same saved mode
+    (status.collect()), so it can warn before this blocks SSH on the current network.
     """
     set_enabled(bool(settings.load().get("trusted_mode")))
 

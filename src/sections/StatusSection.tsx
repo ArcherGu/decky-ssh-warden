@@ -15,6 +15,7 @@ export function StatusSection({ status, refresh }: { status: Status; refresh: ()
 
   const repair = () => {
     // In trusted mode a missing drop rule may be what lets the current network in right now.
+    // status.trusted_mode is the saved mode, the one the repair applies.
     const exposed = status.trusted_mode ? status.networks.filter((n) => !n.trusted && n.ssh_allowed).map((n) => n.name) : [];
     if (exposed.length === 0) {
       run(repairFirewall);
@@ -36,12 +37,12 @@ export function StatusSection({ status, refresh }: { status: Status; refresh: ()
           <Field label={t.status.configError} description={status.config_error} bottomSeparator="none" />
         </PanelSectionRow>
       )}
-      {status.firewall_missing > 0 && (
+      {status.firewall_out_of_sync > 0 && (
         <PanelSectionRow>
           <ButtonItem
             layout="below"
-            label={<span style={{ color: WARN }}>{t.status.firewallMissing}</span>}
-            description={t.status.firewallMissingHint(status.firewall_missing)}
+            label={<span style={{ color: WARN }}>{t.status.firewallOutOfSync}</span>}
+            description={t.status.firewallOutOfSyncHint(status.firewall_out_of_sync)}
             disabled={busy}
             onClick={repair}
           >

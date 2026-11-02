@@ -151,6 +151,23 @@ def missing_rules(recorded: list[dict], zones: dict[str, dict]) -> list[dict]:
     return missing
 
 
+def out_of_sync(data: dict, zones: dict[str, dict]) -> list[dict]:
+    """How a zones_snapshot() differs from the saved mode, i.e. what trust.repair_firewall() fixes.
+
+    Recorded rules firewalld lacks (missing_rules()), plus what an interrupted trusted-mode
+    switch leaves: no trusted zone while the mode is on, or the zone and its rules while it is
+    off (trust.set_enabled() saves "off" first, so an interrupted switch-off ends up here).
+    """
+    recorded = data.get("firewall", [])
+    zone = {"zone": TRUSTED_ZONE, "kind": "zone"}
+    if data.get("trusted_mode"):
+        return ([] if TRUSTED_ZONE in zones else [zone]) + missing_rules(recorded, zones)
+    # Block rules and trusted-zone rules only belong to trusted mode.
+    leftover = [e for e in recorded if e["kind"] == "block" or e["zone"] == TRUSTED_ZONE]
+    rest = [e for e in recorded if e not in leftover]
+    return ([zone] if TRUSTED_ZONE in zones else []) + leftover + missing_rules(rest, zones)
+
+
 def _port_allowed(zone: str, port: int) -> bool:
     """Whether a service/port rule of `zone` admits `port` (block rules not considered)."""
     if port == 22 and succeeds(["firewall-cmd", f"--zone={zone}", "--query-service=ssh"]):

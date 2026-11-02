@@ -51,9 +51,10 @@ export interface Status {
   sessions: string[];
   logins: { recent: Login[]; failed: number };
   firewall: boolean;
-  /** How many firewall rules the plugin added are gone, e.g. after it was killed halfway. */
-  firewall_missing: number;
+  /** In how many places the firewall differs from the saved mode, e.g. after the plugin was killed halfway. */
+  firewall_out_of_sync: number;
   networks: Network[];
+  /** The saved mode, which repairFirewall() applies. */
   trusted_mode: boolean;
   saved_networks: SavedNetwork[];
 }
@@ -98,5 +99,5 @@ export const importKeys = (path: string) => unwrap(importKeysCall(path));
 export const removeKey = (fingerprint: string) => unwrap(removeKeyCall(fingerprint));
 export const setTrustedMode = (on: boolean) => unwrap(setTrustedModeCall(on));
 export const setNetworkTrusted = (uuid: string, on: boolean) => unwrap(setNetworkTrustedCall(uuid, on));
-/** Add back the firewall rules counted in Status.firewall_missing. */
+/** Make the firewall match Status.trusted_mode again (see Status.firewall_out_of_sync). */
 export const repairFirewall = () => unwrap(repairFirewallCall());
