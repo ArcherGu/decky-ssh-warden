@@ -61,7 +61,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - **Every rule the plugin adds must go through `net.sync_ssh_firewall()`.** It computes the wanted rules for the current mode, adds new rules before removing old ones (so SSH is never blocked in between), and records what it added in the `firewall` field of `settings.json` so it can be undone. Do not call `firewall-cmd --add-*` anywhere else.
 - Trusted networks use a zone of our own, `sshwarden` (`net.TRUSTED_ZONE`): a copy of the default zone's services and ports (excluding ports the plugin opened itself); trusted connections get `connection.zone=sshwarden`. Every other network's zone **drops** the SSH port (drop, not reject), so on a public network the port looks like nothing is there.
 - Every rule is applied to both the runtime and the permanent configuration (`net._firewall()` does this).
-- A rule is recorded before it is added, so a plugin killed halfway can leave a record whose rule is missing. `status.collect()` reports those as `firewall_missing` (from the snapshot it already reads, and only while no change holds the lock: `lock.unless_busy()`), and the panel offers `trust.repair_firewall()`, which re-applies the current mode.
+- A rule is recorded before it is added, so a plugin killed halfway can leave a record whose rule is missing. Switching trusted mode off saves `trusted_mode=False` before changing anything, so an interrupted switch-off leaves the zone or its rules behind while the mode already reads off. `net.out_of_sync()` finds both (missing records; the zone or its rules while off; no zone while on), `status.collect()` reports them as `firewall_out_of_sync` (from the snapshot it already reads, and only while no change holds the lock: `lock.unless_busy()`), and the panel offers `trust.repair_firewall()`, which re-applies the saved mode. **The panel's `trusted_mode` is that saved mode**, so the frontend's "will the repair block the current network?" check and the backend's repair always agree; do not derive it from the system again.
 - After `firewall-cmd --reload`, use the logic in `net.reload_firewall()`: rebind **only** Wi-Fi and Ethernet devices to their zones. Leave every other interface alone, e.g. VPN/proxy tun devices created by other plugins; they may not belong to any zone, and binding them would change the user's network setup.
 - Each `firewall-cmd` call costs about 0.3 s on the Deck. `status.collect()` runs every 3 seconds while the panel is open, so **the status must read all zones at once with `zones_snapshot()`**; do not add per-zone `firewall-cmd` calls there. A status call currently takes about 0.7 s.
 
@@ -137,7 +137,7 @@ Before any test that could affect SSH access (stopping sshd, changing the port o
   printf '%s\n%s\n' '<current password>' '<new password>' | sudo python3 -B -m sshwarden passwd
   sudo python3 -B -m sshwarden trusted-mode on|off
   sudo python3 -B -m sshwarden trust <connection UUID> on|off
-  sudo python3 -B -m sshwarden repair-firewall   # re-add recorded rules that went missing
+  sudo python3 -B -m sshwarden repair-firewall   # make the firewall match the saved mode again
   sudo python3 -B -m sshwarden keys
   sudo python3 -B -m sshwarden key-import /path/to/key.pub
   sudo python3 -B -m sshwarden key-remove SHA256:<fingerprint>
