@@ -41,7 +41,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 ## Backend conventions
 
-- **Run system commands only through `proc.run()`**, never `subprocess` directly. Decky is a PyInstaller app that points `LD_LIBRARY_PATH` at its bundled libraries, which makes system programs such as `sshd`, `bash` and `nmcli` fail to start; `run()` cleans that up. It also pins `LC_ALL=C` and `PATH` so output stays parseable.
+- **Run system commands only through `proc.run()`**, never `subprocess` directly. Decky is a PyInstaller app that points `LD_LIBRARY_PATH` at its bundled libraries, which makes system programs such as `sshd`, `bash` and `nmcli` fail to start; `run()` cleans that up. It also pins `LC_ALL=C` and `PATH` so output stays parseable. Input is encoded strictly (it may be a password, which must reach the command exactly; an unencodable string raises), output is decoded leniently, and a failed command's `CommandError` keeps its `returncode`.
 - Backend functions are synchronous. `_call()` in `main.py` runs them with `asyncio.to_thread` and returns `{"ok": true, "data": ...}` or `{"ok": false, "error": "..."}`. For errors the user should see, `raise UserError("<code>", "<English message with {params}>", **params)`; `_call()` adds `code` and `params` to the result and the panel shows the translation of that code from `errors` in `src/i18n.ts`, falling back to the English message. `CommandError`, raised by `proc.run()`, is a `UserError` with the code `command_failed`.
 - **Every change holds `lock.changes()`**, an `flock` on `/run/ssh-warden.lock`. `_call()` takes it unless `exclusive=False` (only for reads and for functions that take it themselves; taking it twice in one process deadlocks), and the CLI takes it for its change commands. Panel sections only disable their own controls, and during an update the old plugin, the background uninstall and two new plugin processes overlap, so without it changes would race on `settings.json` and on checks that must be atomic.
 - **The system is the source of truth**, not `settings.json`. Settings only store two kinds of data: changes the plugin made (so they can be undone) and user preferences (the trusted-network list).
@@ -61,6 +61,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - **Every rule the plugin adds must go through `net.sync_ssh_firewall()`.** It computes the wanted rules for the current mode, adds new rules before removing old ones (so SSH is never blocked in between), and records what it added in the `firewall` field of `settings.json` so it can be undone. Do not call `firewall-cmd --add-*` anywhere else.
 - Trusted networks use a zone of our own, `sshwarden` (`net.TRUSTED_ZONE`): a copy of the default zone's services and ports (excluding ports the plugin opened itself); trusted connections get `connection.zone=sshwarden`. Every other network's zone **drops** the SSH port (drop, not reject), so on a public network the port looks like nothing is there.
 - Every rule is applied to both the runtime and the permanent configuration (`net._firewall()` does this).
+- A rule is recorded before it is added, so a plugin killed halfway can leave a record whose rule is missing. `status.collect()` reports those as `firewall_missing` (from the snapshot it already reads, and only while no change holds the lock: `lock.unless_busy()`), and the panel offers `trust.repair_firewall()`, which re-applies the current mode.
 - After `firewall-cmd --reload`, use the logic in `net.reload_firewall()`: rebind **only** Wi-Fi and Ethernet devices to their zones. Leave every other interface alone, e.g. VPN/proxy tun devices created by other plugins; they may not belong to any zone, and binding them would change the user's network setup.
 - Each `firewall-cmd` call costs about 0.3 s on the Deck. `status.collect()` runs every 3 seconds while the panel is open, so **the status must read all zones at once with `zones_snapshot()`**; do not add per-zone `firewall-cmd` calls there. A status call currently takes about 0.7 s.
 
@@ -71,7 +72,7 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 - Passwords go to `chpasswd` on stdin only. They must never appear in command arguments, logs or return values.
 - Disabling password login needs at least one key, and removing the last key needs password login on. `keys.remove_key()` checks the second rule itself (it imports `sshd` inside the function because `sshd` imports `keys`).
 - Never read a private key into anything that is stored, logged or returned: `keys.import_file()` rejects files that look like one before parsing them.
-- **Never open a path the caller chose as root.** `keys.import_file()` reads the picked file as the deck user (`runuser -u deck -- head -c ...`); otherwise any local process could probe root-only files through the plugin.
+- **Never open a path the caller chose as root.** `keys.import_file()` reads the picked file as the deck user (`runuser -u deck -- timeout 4 head -c ...`); otherwise any local process could probe root-only files through the plugin. Keep a timeout *inside* `runuser`: it forks, so killing it on `run()`'s timeout would leave `head` blocked on a FIFO for good. Limits on what a command printed count bytes (`len(text.encode())`), not characters.
 - **Never touch a path under `/home/deck` with plain `open()`, `chmod()` or `chown()`.** Those directories belong to deck, and anything running as deck could swap in a symlink to `/etc/shadow`. Use `safefile` (directory descriptors, `O_NOFOLLOW`, a random temporary name with `O_EXCL`, `fchmod`/`fchown`, only regular files read). Files the plugin creates there for the user, such as `~/.ssh` and `authorized_keys`, must belong to deck.
 - **Whenever you add a new kind of system change, extend `cleanup.revert_all()`** so uninstalling the plugin leaves nothing behind. Decky also runs `_uninstall` before every update or reinstall (`browser._install()` → `uninstall_plugin()`), so if the user would want the setting back after an update, note it in `cleanup._note_settings()` and re-apply it in `cleanup._restore()` (idempotently: Decky starts a new plugin twice and kills the first process within seconds, so a restore may run again).
 - **Decky SIGKILLs a plugin 5 s after asking it to stop**, then deletes its directory. `_uninstall` therefore only calls `cleanup.start_uninstall()`, which copies the package to `/run/ssh-warden-uninstall` and runs `python3 -m sshwarden uninstall` from there as the transient service `ssh-warden-uninstall`. Keep `_uninstall` itself well under 5 s.
@@ -91,16 +92,16 @@ SSH Warden is a [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader
 
 ```bash
 pnpm install
-pnpm typecheck    # tsc --noEmit
+pnpm typecheck    # tsc on src, then on the frontend tests (tsconfig.test.json)
 pnpm build        # rollup → dist/index.js
 pnpm package      # build and package out/decky-ssh-warden.zip
 pnpm test         # frontend (node --test) and backend (unittest) tests
 pnpm check:i18n   # every UserError code the backend raises is translated in both languages
 ```
 
-- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: frozen install, typecheck, frontend tests and `pnpm package`; backend tests and `check:i18n` on Python 3.14 (what Decky bundles); `bash -n` on the shell scripts. Keep it green.
+- **CI** (`.github/workflows/ci.yml`) runs on every push and pull request: frozen install, typecheck, frontend tests and `pnpm package`, whose zip is kept as the run's artifact for 14 days; backend tests and `check:i18n` on Python 3.14 (what Decky bundles); `bash -n` on the shell scripts. Keep it green.
 - The backend needs Python 3.10+. A stock macOS `python3` is 3.9, so point the scripts at a newer one: `PYTHON=/opt/homebrew/bin/python3.12 pnpm test`.
-- **Add tests with every change to backend logic.** `tests/backend/helpers.py` has `TempDirTest` (a real temporary directory, settings.json and lock file per test) and `FakeNetwork`, a fake firewalld + NetworkManager for `net.py`/`trust.py`; patch `run`/`succeeds` in the module under test rather than running system commands. Tests run unprivileged, so they cannot touch the system. Frontend tests live in `tests/frontend/*.test.ts` and import `src/` files with their `.ts` extension; Node runs them by stripping the types, so only erasable TypeScript syntax works there.
+- **Add tests with every change to backend logic.** `tests/backend/helpers.py` has `TempDirTest` (a real temporary directory, settings.json and lock file per test) and `FakeNetwork`, a fake firewalld + NetworkManager for `net.py`/`trust.py`; patch `run`/`succeeds` in the module under test rather than running system commands. Tests run unprivileged, so they cannot touch the system. `test_main.py` imports `main.py` with a stand-in `decky` module and checks every method `src/api.ts` calls exists on `Plugin`; `test_syntax.py` compiles every `.py` file in the repository, including `dev/cdp.py`. A few tests need Linux tools (GNU `timeout`) and are skipped on macOS; CI runs them. Frontend tests live in `tests/frontend/*.test.ts` and import `src/` files with their `.ts` extension; Node runs them by stripping the types, so only erasable TypeScript syntax works there (`tsconfig.test.json` enforces it with `erasableSyntaxOnly`).
 
 - pnpm 12 no longer reads a `pnpm` field in `package.json`; those settings live in `pnpm-workspace.yaml`.
 - `tsconfig.json` needs `skipLibCheck`: the `@decky/api` type declarations reference `react-router`, which is not installed.
@@ -136,6 +137,7 @@ Before any test that could affect SSH access (stopping sshd, changing the port o
   printf '%s\n%s\n' '<current password>' '<new password>' | sudo python3 -B -m sshwarden passwd
   sudo python3 -B -m sshwarden trusted-mode on|off
   sudo python3 -B -m sshwarden trust <connection UUID> on|off
+  sudo python3 -B -m sshwarden repair-firewall   # re-add recorded rules that went missing
   sudo python3 -B -m sshwarden keys
   sudo python3 -B -m sshwarden key-import /path/to/key.pub
   sudo python3 -B -m sshwarden key-remove SHA256:<fingerprint>
