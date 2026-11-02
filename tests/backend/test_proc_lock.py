@@ -24,6 +24,11 @@ class ProcTest(unittest.TestCase):
             with self.subTest(call.__name__), self.assertRaises(UnicodeEncodeError):
                 call(["cat"], input="pass\ud800word")
 
+    def test_failure_keeps_the_exit_status(self):
+        with self.assertRaises(CommandError) as e:
+            proc.run(["sh", "-c", "exit 124"])
+        self.assertEqual((e.exception.returncode, e.exception.params["detail"]), (124, "exit status 124"))
+
     def test_succeeds_with_input(self):
         self.assertTrue(proc.succeeds(["grep", "-q", "secret"], input="the secret\n"))
         self.assertFalse(proc.succeeds(["grep", "-q", "secret"], input="nothing\n"))

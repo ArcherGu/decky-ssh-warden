@@ -7,8 +7,9 @@ SYSTEM_PATH = "/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin"
 
 
 class CommandError(UserError):
-    def __init__(self, command: str, detail: str):
+    def __init__(self, command: str, detail: str, returncode: int | None = None):
         super().__init__("command_failed", "{command} failed: {detail}", command=command, detail=detail)
+        self.returncode = returncode  # None when the command did not run or was killed
 
 
 def _system_env() -> dict[str, str]:
@@ -44,7 +45,7 @@ def run(args: list[str], *, input: str | None = None, check: bool = True, timeou
     stdout = proc.stdout.decode(errors="replace")
     if check and proc.returncode != 0:
         detail = (proc.stderr.decode(errors="replace") or stdout).strip() or f"exit status {proc.returncode}"
-        raise CommandError(" ".join(args), detail)
+        raise CommandError(" ".join(args), detail, proc.returncode)
     return stdout
 
 

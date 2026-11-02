@@ -1,14 +1,16 @@
 """authorized_keys: parsing, fingerprints, import and removal."""
+import errno
 import os
 import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from types import SimpleNamespace
 
 from helpers import TempDirTest
-from sshwarden import keys, sshd
+from sshwarden import keys, proc, sshd
 from sshwarden.errors import UserError
 from sshwarden.proc import CommandError
 
@@ -62,13 +64,14 @@ class KeyFileTest(TempDirTest):
 
     @staticmethod
     def fake_runuser_head(args, timeout=30, **kw):
-        """`runuser -u deck -- head -c N -- PATH`, run as the test user."""
-        assert args[:3] == ["runuser", "-u", "deck"] and args[4] == "head", args
+        """`runuser -u deck -- timeout T head -c N -- PATH`, run as the test user."""
+        assert args[:5] == ["runuser", "-u", "deck", "--", "timeout"] and args[6:8] == ["head", "-c"], args
+        assert timeout > int(args[5]), "run()'s timeout is only a backstop"
         try:
             with open(args[-1], "rb") as f:
-                return f.read(int(args[6])).decode("utf-8", "replace")
+                return f.read(int(args[8])).decode("utf-8", "replace")
         except OSError as e:
-            raise CommandError(" ".join(args), f"head: cannot open '{args[-1]}' for reading: {e.strerror}")
+            raise CommandError(" ".join(args), f"head: cannot open '{args[-1]}' for reading: {e.strerror}", 1)
 
     def write_file(self, name: str, text: str) -> str:
         path = self.path(name)
@@ -108,6 +111,30 @@ class KeyFileTest(TempDirTest):
             keys.import_file(self.path("missing.pub"))
         self.assertEqual(e.exception.code, "key_file_unreadable")
         self.assertEqual(e.exception.params, {"file": "missing.pub", "reason": "No such file or directory"})
+
+    def test_size_limit_counts_bytes(self):
+        # 30 000 Chinese characters are 90 000 bytes: too large, though fewer characters than the limit.
+        with self.assertRaises(UserError) as e:
+            keys.import_file(self.write_file("big.pub", f"{ED25519} {'钥' * 30_000}\n"))
+        self.assertEqual(e.exception.params["reason"], "file too large")
+        self.assertFalse(os.path.exists(self.authorized_keys))
+
+    @unittest.skipUnless(shutil.which("timeout"), "needs GNU timeout")
+    def test_a_fifo_times_out_without_leaving_a_reader_behind(self):
+        self.patch(keys, "READ_TIMEOUT", 1)
+        # The real command minus runuser (which needs root).
+        self.patch(keys, "run", lambda args, **kw: proc.run(args[4:], **kw))
+        fifo = self.path("key.pub")
+        os.mkfifo(fifo)
+        start = time.monotonic()
+        with self.assertRaises(UserError) as e:
+            keys.import_file(fifo)
+        self.assertEqual(e.exception.params["reason"], "timed out")
+        self.assertLess(time.monotonic() - start, 2.5, "stopped by timeout, not by run()'s backstop")
+        # With no reader left waiting, opening the FIFO for writing fails at once.
+        with self.assertRaises(OSError) as e:
+            os.close(os.open(fifo, os.O_WRONLY | os.O_NONBLOCK))
+        self.assertEqual(e.exception.errno, errno.ENXIO)
 
     def test_remove(self):
         keys.import_file(self.write_file("a.pub", f"{ED25519} a\n"))

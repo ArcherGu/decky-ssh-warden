@@ -12,6 +12,8 @@ from .proc import CommandError, run
 HOME = f"/home/{DECK_USER}"
 SSH_DIR = f"{HOME}/.ssh"
 MAX_IMPORT_BYTES = 64 * 1024
+READ_TIMEOUT = 4  # seconds; a FIFO would otherwise block the import forever
+TIMED_OUT = 124  # exit status of `timeout`
 MAX_FILE_BYTES = 1024 * 1024
 
 # Key types sshd accepts in authorized_keys (OpenSSH 10 dropped DSA).
@@ -126,14 +128,19 @@ def import_file(path: str) -> dict:
     # Read as the deck user, never as root: it is the user's own key file, and any local
     # process can ask the plugin to import a path (see account.py). As root that would reveal
     # whether a root-only file holds a private key, and opening some device files has side
-    # effects. The timeout covers a FIFO.
+    # effects. `timeout` runs inside runuser because runuser forks: if run() killed it, the head
+    # below would stay blocked on a FIFO for good. run()'s own timeout is only a backstop.
+    command = ["runuser", "-u", DECK_USER, "--", "timeout", str(READ_TIMEOUT), "head", "-c", str(MAX_IMPORT_BYTES + 1), "--", path]
     try:
-        text = run(["runuser", "-u", DECK_USER, "--", "head", "-c", str(MAX_IMPORT_BYTES + 1), "--", path], timeout=5)
+        text = run(command, timeout=READ_TIMEOUT + 2)
     except CommandError as e:
         detail = e.params["detail"]
-        reason = "timed out" if "timed out" in detail else detail.rsplit(": ", 1)[-1]
+        timed_out = e.returncode == TIMED_OUT or "timed out" in detail
+        reason = "timed out" if timed_out else detail.rsplit(": ", 1)[-1]
         raise UserError("key_file_unreadable", "Cannot read {file}: {reason}", file=name, reason=reason)
-    if len(text) > MAX_IMPORT_BYTES:
+    # Count bytes, not characters. Invalid bytes were replaced by U+FFFD, which is longer in
+    # UTF-8, so a file over the limit is never missed.
+    if len(text.encode()) > MAX_IMPORT_BYTES:
         raise UserError("key_file_unreadable", "Cannot read {file}: {reason}", file=name, reason="file too large")
     # Never parse, store or echo a private key that was picked by mistake.
     if "PRIVATE KEY" in text or "PuTTY-User-Key-File" in text:
