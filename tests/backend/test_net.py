@@ -269,6 +269,24 @@ class RevertAllTest(NetTest):
             self.assertEqual(config["public"]["rich"], set())
         self.assertEqual(self.records(), [])
 
+    def test_needs_no_sshd(self):
+        # E.g. the user broke sshd_config: sshd -T fails, yet every rule must still go.
+        self.ports = {222}
+        self.sync({222})
+        trust.set_network_trusted("uuid-cafe", True)
+        trust.set_enabled(True)
+
+        def broken():
+            raise CommandError("sshd -T", "/etc/ssh/sshd_config line 3: Bad configuration option")
+
+        self.patch(trust, "_ssh_ports", broken)
+        cleanup.revert_all()
+        self.assertNotIn(net.TRUSTED_ZONE, self.fw.permanent)
+        for config in (self.fw.permanent, self.fw.runtime):
+            self.assertNotIn("222/tcp", config["public"]["ports"])
+            self.assertEqual(config["public"]["rich"], set())
+        self.assertEqual(self.records(), [])
+
     def test_removes_every_rule_zone_and_record(self):
         self.ports = {222}
         self.sync({222})

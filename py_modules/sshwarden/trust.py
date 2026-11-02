@@ -19,6 +19,19 @@ def is_enabled(data: dict) -> bool:
 
 def set_enabled(on: bool) -> None:
     _require_firewall()
+    _switch(on, _ssh_ports())
+
+
+def remove_all() -> None:
+    """Switch trusted mode off and remove every firewall rule the plugin added (for uninstall).
+
+    No SSH port is wanted, so this needs no sshd and works with a config sshd -T rejects.
+    """
+    _require_firewall()
+    _switch(False, set())
+
+
+def _switch(on: bool, ports: set[int]) -> None:
     data = settings.load()
     known = {n["uuid"] for n in net.saved_networks()}
     if on:
@@ -28,13 +41,13 @@ def set_enabled(on: bool) -> None:
             if uuid in known:
                 net.set_connection_zone(uuid, TRUSTED_ZONE)
         data["trusted_mode"] = True
-        net.sync_ssh_firewall(_ssh_ports(), data)
+        net.sync_ssh_firewall(ports, data)
     else:
         # Saved before anything changes, so a repair after an interruption finishes switching
         # off, as the user asked, instead of switching back on (net.out_of_sync() spots it).
         data["trusted_mode"] = False
         settings.save(data)
-        net.sync_ssh_firewall(_ssh_ports(), data)
+        net.sync_ssh_firewall(ports, data)
         for uuid in known:
             if net.connection_zone(uuid) == TRUSTED_ZONE:
                 net.set_connection_zone(uuid, "")
