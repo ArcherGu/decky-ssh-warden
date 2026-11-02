@@ -1,0 +1,46 @@
+name: Release
+
+# Push a tag such as v0.1.0 (matching "version" in package.json) to publish that build.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # create the release
+
+jobs:
+  release:
+    name: Build and publish the plugin zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag matches package.json
+        run: |
+          version=$(node -p 'require("./package.json").version')
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in package.json"
+            exit 1
+          fi
+      # pnpm version comes from "packageManager" in package.json.
+      - uses: pnpm/action-setup@v6
+        with:
+          cache: true
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14" # what Decky Loader bundles
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:i18n
+      - run: pnpm package
+      # Always the same file name, so .../releases/latest/download/decky-ssh-warden.zip
+      # stays a working "Install Plugin from URL" link.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" out/decky-ssh-warden.zip
+          --verify-tag --title "SSH Warden $GITHUB_REF_NAME" --generate-notes
