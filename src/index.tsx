@@ -32,7 +32,7 @@ function Content() {
         </PanelSection>
       )}
       <ServiceSection status={status} refresh={refresh} />
-      <StatusSection status={status} />
+      <StatusSection status={status} refresh={refresh} />
       <ConnectionSection status={status} refresh={refresh} />
       <LoginSection status={status} refresh={refresh} />
       <KeysSection status={status} refresh={refresh} />

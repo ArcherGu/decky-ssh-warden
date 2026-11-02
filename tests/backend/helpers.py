@@ -115,6 +115,24 @@ class FakeNetwork:
             return self._firewall(args)
         raise AssertionError(f"unexpected command: {args}")
 
+    def _list_all_zones(self):
+        """The runtime zones in firewall-cmd's --list-all-zones layout."""
+        lines = []
+        for name, z in sorted(self.runtime.items()):
+            devices = sorted(d for d in self.bindings if self.zone_of(d) == name)
+            flags = (["default"] if name == self.default else []) + (["active"] if devices else [])
+            lines += [
+                f"{name} ({', '.join(flags)})" if flags else name,
+                "  target: default",
+                f"  interfaces: {' '.join(devices)}",
+                f"  services: {' '.join(sorted(z['services']))}",
+                f"  ports: {' '.join(sorted(z['ports']))}",
+                "  rich rules: ",
+                *(f"\t{rule}" for rule in sorted(z["rich"])),
+                "",
+            ]
+        return "\n".join(lines)
+
     def _nmcli(self, args):
         if args[:3] == ["nmcli", "-t", "-f"]:
             fields, active = args[3].split(","), "--active" in args
@@ -144,6 +162,8 @@ class FakeNetwork:
             if device not in self.bindings:
                 self._fail(args)  # firewall-cmd: "no zone"
             return self.bindings[device] + "\n"
+        if "--list-all-zones" in args:
+            return self._list_all_zones()
         if "--get-zones" in args:
             return " ".join(sorted(config)) + "\n"
         if "--reload" in args:

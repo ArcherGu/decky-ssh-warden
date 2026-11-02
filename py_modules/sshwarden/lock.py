@@ -21,3 +21,21 @@ def changes():
         yield
     finally:
         os.close(fd)  # also releases the lock
+
+
+@contextlib.contextmanager
+def unless_busy():
+    """Hold the lock only if nobody does right now; yields whether it is held.
+
+    For reads that must not see a change halfway (see status.py), without making them wait.
+    """
+    fd = os.open(PATH, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            held = True
+        except BlockingIOError:
+            held = False
+        yield held
+    finally:
+        os.close(fd)

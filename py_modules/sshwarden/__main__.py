@@ -30,6 +30,7 @@ def main(argv: list[str]) -> int:
         "key-remove": lambda fingerprint: keys.remove_key(fingerprint),
         "trusted-mode": lambda v: trust.set_enabled(on_off(v)),
         "trust": lambda uuid, v: trust.set_network_trusted(uuid, on_off(v)),
+        "repair-firewall": lambda: trust.repair_firewall(),
         "cleanup": lambda: cleanup.revert_all(),
         # What the plugin's _uninstall runs in the background: note the settings, then revert.
         "uninstall": lambda: cleanup.uninstall(),

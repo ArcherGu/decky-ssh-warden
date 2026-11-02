@@ -131,6 +131,26 @@ def zone_admits(zone: dict, port: int) -> bool:
     return False
 
 
+def missing_rules(recorded: list[dict], zones: dict[str, dict]) -> list[dict]:
+    """Rules in data["firewall"] that a zones_snapshot() lacks.
+
+    They go missing when the plugin is killed between recording a rule and adding it (see
+    sync_ssh_firewall()), or when someone else changes the firewall.
+    """
+    missing = []
+    for entry in recorded:
+        zone = zones.get(entry["zone"])
+        if zone is None:
+            present = False
+        elif entry["kind"] == "port":
+            present = f"{entry['port']}/tcp" in zone["ports"]
+        else:
+            present = any(_rule_blocks(r, entry["port"]) for r in zone["rich_rules"])
+        if not present:
+            missing.append(entry)
+    return missing
+
+
 def _port_allowed(zone: str, port: int) -> bool:
     """Whether a service/port rule of `zone` admits `port` (block rules not considered)."""
     if port == 22 and succeeds(["firewall-cmd", f"--zone={zone}", "--query-service=ssh"]):

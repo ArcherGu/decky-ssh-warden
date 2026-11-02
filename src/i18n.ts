@@ -31,6 +31,13 @@ const en = {
   status: {
     title: "Status",
     configError: "Config error",
+    firewallMissing: "Firewall rules missing",
+    firewallMissingHint: (n: number) =>
+      `${n === 1 ? "A rule" : `${n} rules`} SSH Warden added to the firewall ${n === 1 ? "is" : "are"} gone, so SSH may be blocked or open on the wrong networks`,
+    repair: "Repair",
+    repairTitle: "SSH will be blocked on this network",
+    repairBody: (names: string) =>
+      `Trusted mode should block SSH on "${names}", but with the rules missing it is open right now. After repairing, new SSH connections from it are refused (open ones stay). Repair anyway?`,
     network: "Network",
     notConnected: "Not connected",
     noIPv4: "No IPv4 address",
@@ -169,6 +176,12 @@ const zhCN: typeof en = {
   status: {
     title: "状态",
     configError: "配置错误",
+    firewallMissing: "防火墙规则缺失",
+    firewallMissingHint: (n) => `SSH Warden 添加的 ${n} 条防火墙规则不见了，SSH 可能在不该拦截的网络被拦截，或在不该开放的网络开放`,
+    repair: "修复",
+    repairTitle: "修复后当前网络将拦截 SSH",
+    repairBody: (names) =>
+      `可信模式本应拦截「${names}」上的 SSH，但由于规则缺失，现在是开放的。修复后将无法从它建立新的 SSH 连接（已建立的连接不受影响）。确定修复吗？`,
     network: "当前网络",
     notConnected: "未连接",
     noIPv4: "没有 IPv4 地址",

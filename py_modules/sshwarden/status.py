@@ -1,4 +1,4 @@
-from . import DECK_USER, account, keys, net, settings, sshd
+from . import DECK_USER, account, keys, lock, net, settings, sshd
 from .errors import UserError
 from .proc import CommandError
 
@@ -17,11 +17,15 @@ def collect() -> dict:
         key_list, keys_unsafe = [], True
 
     fw = net.firewall_running()
-    zones = net.zones_snapshot() if fw else {}
+    # A change records each rule just before adding it, so only compare the records with the
+    # firewall while no change runs; this read never waits for one.
+    with lock.unless_busy() as idle:
+        zones = net.zones_snapshot() if fw else {}
+        data = settings.load()
+    missing = net.missing_rules(data.get("firewall", []), zones) if fw and idle else []
     default_zone = next((name for name, z in zones.items() if z["default"]), None)
     zone_of_device = {dev: name for name, z in zones.items() for dev in z["interfaces"]}
 
-    data = settings.load()
     trusted_ids = set(data.get("trusted", []))
     networks = net.active_networks()
     for n in networks:
@@ -46,6 +50,8 @@ def collect() -> dict:
         "sessions": sshd.sessions(listen_ports),
         "logins": sshd.login_history(),
         "firewall": fw,
+        # Rules the plugin added that firewalld no longer has; the panel offers to repair them.
+        "firewall_missing": len(missing),
         "networks": networks,
         # Same rule as trust.is_enabled(), from the snapshot instead of extra firewall-cmd calls.
         "trusted_mode": bool(data.get("trusted_mode")) and net.TRUSTED_ZONE in zones,

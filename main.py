@@ -71,6 +71,9 @@ class Plugin:
     async def set_network_trusted(self, uuid: str, on: bool) -> dict:
         return await _call(trust.set_network_trusted, str(uuid), bool(on))
 
+    async def repair_firewall(self) -> dict:
+        return await _call(trust.repair_firewall)
+
     async def _main(self):
         settings.init(decky.DECKY_PLUGIN_SETTINGS_DIR)
         decky.logger.info("SSH Warden loaded")

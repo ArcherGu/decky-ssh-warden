@@ -1,19 +1,52 @@
-import { Field, PanelSection, PanelSectionRow } from "@decky/ui";
-import { Status } from "../api";
+import { ButtonItem, Field, PanelSection, PanelSectionRow, showModal } from "@decky/ui";
+import { repairFirewall, Status } from "../api";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { formatTime, sshCommand } from "../format";
 import { t } from "../i18n";
+import { useAction } from "../useAction";
 
 const OK = "#5ba32b";
 const WARN = "#e0a33b";
 const MUTED = "#8b929a";
 
-export function StatusSection({ status }: { status: Status }) {
+export function StatusSection({ status, refresh }: { status: Status; refresh: () => Promise<void> }) {
+  const { busy, run } = useAction(refresh);
   const lastLogin = status.logins.recent[0];
+
+  const repair = () => {
+    // In trusted mode a missing drop rule may be what lets the current network in right now.
+    const exposed = status.trusted_mode ? status.networks.filter((n) => !n.trusted && n.ssh_allowed).map((n) => n.name) : [];
+    if (exposed.length === 0) {
+      run(repairFirewall);
+      return;
+    }
+    showModal(
+      <ConfirmDialog
+        title={t.status.repairTitle}
+        description={t.status.repairBody(exposed.join(t.listSeparator))}
+        okText={t.status.repair}
+        onConfirm={() => run(repairFirewall)}
+      />,
+    );
+  };
   return (
     <PanelSection title={t.status.title}>
       {status.config_error && (
         <PanelSectionRow>
           <Field label={t.status.configError} description={status.config_error} bottomSeparator="none" />
+        </PanelSectionRow>
+      )}
+      {status.firewall_missing > 0 && (
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            label={<span style={{ color: WARN }}>{t.status.firewallMissing}</span>}
+            description={t.status.firewallMissingHint(status.firewall_missing)}
+            disabled={busy}
+            onClick={repair}
+          >
+            {t.status.repair}
+          </ButtonItem>
         </PanelSectionRow>
       )}
 

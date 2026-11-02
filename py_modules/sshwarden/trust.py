@@ -39,6 +39,15 @@ def set_enabled(on: bool) -> None:
     settings.save(data)
 
 
+def repair_firewall() -> None:
+    """Put back recorded firewall rules that went missing (see net.missing_rules()).
+
+    Applying the current mode again does it: sync_ssh_firewall() adds every recorded rule that
+    is still wanted, and turning trusted mode on also recreates a missing zone.
+    """
+    set_enabled(bool(settings.load().get("trusted_mode")))
+
+
 def set_network_trusted(uuid: str, on: bool) -> None:
     data = settings.load()
     trusted = [u for u in data.get("trusted", []) if u != uuid]

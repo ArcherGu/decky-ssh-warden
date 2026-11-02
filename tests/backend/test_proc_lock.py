@@ -54,3 +54,9 @@ class LockTest(TempDirTest):
             events.append("first done")
         thread.join(5)
         self.assertEqual(events, ["first done", "second"])
+
+    def test_unless_busy_never_waits(self):
+        with lock.unless_busy() as idle:
+            self.assertTrue(idle)
+        with lock.changes(), lock.unless_busy() as idle:
+            self.assertFalse(idle)

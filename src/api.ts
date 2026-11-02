@@ -51,6 +51,8 @@ export interface Status {
   sessions: string[];
   logins: { recent: Login[]; failed: number };
   firewall: boolean;
+  /** How many firewall rules the plugin added are gone, e.g. after it was killed halfway. */
+  firewall_missing: number;
   networks: Network[];
   trusted_mode: boolean;
   saved_networks: SavedNetwork[];
@@ -80,6 +82,7 @@ const importKeysCall = callable<[path: string], Result<{ added: number; skipped:
 const removeKeyCall = callable<[fingerprint: string], Result<null>>("remove_key");
 const setTrustedModeCall = callable<[on: boolean], Result<null>>("set_trusted_mode");
 const setNetworkTrustedCall = callable<[uuid: string, on: boolean], Result<null>>("set_network_trusted");
+const repairFirewallCall = callable<[], Result<null>>("repair_firewall");
 
 export const getStatus = () => unwrap(getStatusCall());
 export const setRunning = (on: boolean) => unwrap(setRunningCall(on));
@@ -95,3 +98,5 @@ export const importKeys = (path: string) => unwrap(importKeysCall(path));
 export const removeKey = (fingerprint: string) => unwrap(removeKeyCall(fingerprint));
 export const setTrustedMode = (on: boolean) => unwrap(setTrustedModeCall(on));
 export const setNetworkTrusted = (uuid: string, on: boolean) => unwrap(setNetworkTrustedCall(uuid, on));
+/** Add back the firewall rules counted in Status.firewall_missing. */
+export const repairFirewall = () => unwrap(repairFirewallCall());

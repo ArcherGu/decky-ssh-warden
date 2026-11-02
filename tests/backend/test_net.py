@@ -112,6 +112,47 @@ class TrustedModeTest(NetTest):
         self.assertEqual(self.fw.connections["uuid-home"]["zone"], "")
 
 
+class MissingRulesTest(NetTest):
+    """Recorded rules firewalld lacks, e.g. the plugin was killed between recording and adding."""
+
+    def missing(self):
+        return net.missing_rules(self.records(), net.zones_snapshot())
+
+    def setUp(self):
+        super().setUp()
+        self.ports = {222}
+        trust.set_network_trusted("uuid-home", True)
+
+    def test_a_lost_open_port_is_found_and_repaired(self):
+        self.sync({222})
+        self.assertEqual(self.missing(), [])
+        self.fw.runtime["public"]["ports"].discard("222/tcp")
+        self.assertEqual(self.missing(), [{"zone": "public", "kind": "port", "port": 222}])
+        trust.repair_firewall()
+        self.assertTrue(self.fw.has("public", "ports", "222/tcp"))
+        self.assertEqual(self.missing(), [])
+        self.assertNotIn(net.TRUSTED_ZONE, self.fw.permanent)
+
+    def test_a_lost_drop_rule_is_found_and_repaired(self):
+        trust.set_enabled(True)
+        self.assertEqual(self.missing(), [])
+        self.fw.runtime["public"]["rich"].discard(DROP_222)
+        self.assertEqual(self.missing(), [{"zone": "public", "kind": "block", "port": 222}])
+        trust.repair_firewall()
+        self.assertTrue(self.fw.has("public", "rich", DROP_222))
+        self.assertEqual(self.missing(), [])
+
+    def test_a_lost_trusted_zone_is_recreated(self):
+        trust.set_enabled(True)
+        for config in (self.fw.permanent, self.fw.runtime):
+            del config[net.TRUSTED_ZONE]
+        self.assertIn({"zone": net.TRUSTED_ZONE, "kind": "port", "port": 222}, self.missing())
+        trust.repair_firewall()
+        self.assertTrue(self.fw.has(net.TRUSTED_ZONE, "ports", "222/tcp"))
+        self.assertEqual(self.fw.zone_of("wlan0"), net.TRUSTED_ZONE)
+        self.assertEqual(self.missing(), [])
+
+
 class RevertAllTest(NetTest):
     def test_removes_every_rule_zone_and_record(self):
         self.patch(sshd, "cancel_autooff", lambda: None)
