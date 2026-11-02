@@ -24,6 +24,14 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test:frontend
       - run: pnpm package
+      # An installable build of every push, for Decky's "Install plugin from ZIP".
+      # Uploaded as-is (archive: false), so the download is that zip rather than a zip of it.
+      - uses: actions/upload-artifact@v7
+        with:
+          path: out/decky-ssh-warden.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   backend:
     name: Backend (tests, translations, shell syntax)
