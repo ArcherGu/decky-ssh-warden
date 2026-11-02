@@ -1,0 +1,13 @@
+{
+  // The frontend tests: Node runs them by stripping the types, so only tsc checks them.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    // Node can only strip types, not compile enums or namespaces, in tests and what they import.
+    "erasableSyntaxOnly": true,
+    "types": ["node"]
+  },
+  // i18n.test.ts imports i18n.ts by a computed path, which tsc does not follow.
+  "include": ["tests/frontend", "src/i18n.ts"]
+}
