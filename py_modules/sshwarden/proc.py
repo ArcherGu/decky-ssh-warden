@@ -26,32 +26,32 @@ def _system_env() -> dict[str, str]:
     return env
 
 
+def _encode(input: str | None) -> bytes | None:
+    # Strict on purpose: input may be a password, which must reach the command exactly.
+    # Text that cannot be encoded (a lone surrogate) raises UnicodeEncodeError instead.
+    return input.encode() if input is not None else None
+
+
 def run(args: list[str], *, input: str | None = None, check: bool = True, timeout: float = 30) -> str:
     """Run a command and return its stdout. Raises CommandError on failure when check is set."""
     try:
-        proc = subprocess.run(
-            args,
-            input=input,
-            capture_output=True,
-            text=True,
-            errors="replace",  # output of a file the user picked may not be text
-            env=_system_env(),
-            timeout=timeout,
-        )
+        proc = subprocess.run(args, input=_encode(input), capture_output=True, env=_system_env(), timeout=timeout)
     except (OSError, subprocess.TimeoutExpired) as e:
         if check:
             raise CommandError(args[0], str(e)) from e
         return ""
+    # Output is decoded leniently: it may be a file the user picked, or a log line.
+    stdout = proc.stdout.decode(errors="replace")
     if check and proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip() or f"exit status {proc.returncode}"
+        detail = (proc.stderr.decode(errors="replace") or stdout).strip() or f"exit status {proc.returncode}"
         raise CommandError(" ".join(args), detail)
-    return proc.stdout
+    return stdout
 
 
 def succeeds(args: list[str], *, input: str | None = None, timeout: float = 30) -> bool:
     try:
         return subprocess.run(
-            args, input=input, capture_output=True, text=True, env=_system_env(), timeout=timeout
+            args, input=_encode(input), capture_output=True, env=_system_env(), timeout=timeout
         ).returncode == 0
     except (OSError, subprocess.TimeoutExpired):
         return False

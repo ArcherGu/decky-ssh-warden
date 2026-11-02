@@ -32,9 +32,19 @@ def password_set() -> bool:
     return bool(_password_hash())
 
 
+def _encodable(text: str) -> bool:
+    # Panel calls arrive as JSON, which can carry lone surrogates that no keyboard types;
+    # run() refuses to encode them rather than pass on something else.
+    try:
+        text.encode()
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
 def _password_matches(password: str) -> bool:
     # pam_unix's own helper; it reads one NUL-terminated password from stdin.
-    return succeeds(["unix_chkpwd", DECK_USER, "nullok"], input=f"{password}\0")
+    return _encodable(password) and succeeds(["unix_chkpwd", DECK_USER, "nullok"], input=f"{password}\0")
 
 
 def change_password(current_password: str, new_password: str) -> None:
@@ -53,6 +63,8 @@ def change_password(current_password: str, new_password: str) -> None:
         )
     if any(ord(c) < 32 or ord(c) == 127 for c in new_password):
         raise UserError("password_control_chars", "The password must not contain control characters such as line breaks")
+    if not _encodable(new_password):
+        raise UserError("password_invalid_chars", "The password contains characters that cannot be used")
     hashed = _password_hash()
     if _locked(hashed):
         # Setting a password here would also unlock the account.

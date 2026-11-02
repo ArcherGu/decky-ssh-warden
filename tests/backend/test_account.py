@@ -48,3 +48,10 @@ class ChangePasswordTest(TempDirTest):
         self.set_hash("")
         self.assertRefused("password_length", new="short")
         self.assertRefused("password_control_chars", new="new-password\nroot::0:0")
+        # A lone surrogate (possible in JSON, not from a keyboard) must not turn into "?".
+        self.assertRefused("password_invalid_chars", new="new-pass\ud800word")
+
+    def test_unencodable_current_password_is_just_wrong(self):
+        self.set_hash("$y$j9T$salt$hash")
+        self.patch(account, "succeeds", lambda *a, **kw: self.fail("must not reach unix_chkpwd"))
+        self.assertFalse(account._password_matches("old-\udc80password"))

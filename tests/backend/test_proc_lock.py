@@ -18,6 +18,12 @@ class ProcTest(unittest.TestCase):
     def test_binary_output_does_not_break_decoding(self):
         self.assertIn("�", proc.run(["printf", "\\377key"]))
 
+    def test_input_is_passed_exactly_or_not_at_all(self):
+        self.assertEqual(proc.run(["cat"], input="pässwörd\n"), "pässwörd\n")
+        for call in (proc.run, proc.succeeds):
+            with self.subTest(call.__name__), self.assertRaises(UnicodeEncodeError):
+                call(["cat"], input="pass\ud800word")
+
     def test_succeeds_with_input(self):
         self.assertTrue(proc.succeeds(["grep", "-q", "secret"], input="the secret\n"))
         self.assertFalse(proc.succeeds(["grep", "-q", "secret"], input="nothing\n"))
